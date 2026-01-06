@@ -11,7 +11,7 @@
 - Security: Helmet/CORS, RBAC, audit logs, backups
 
 **Non-Negotiables:**
-- Database isolation: Schema-per-module in MVP (modular monolith), DB-per-service in microservices phase (target architecture)
+- Database isolation: MVP uses schema-per-module pattern in ONE shared PostgreSQL instance (strict ownership, no cross-schema queries). Target architecture is microservices with DB-per-service.
 - Contract-first APIs (OpenAPI) with versioning
 - Eventing: Outbox pattern, idempotency, retries, DLQ
 - SSR + SEO optimization required
@@ -83,7 +83,7 @@
 ### Option A: Modular Monolith First (Microservices-Ready)
 
 **Description:**
-Start with a single NestJS application organized into well-defined modules (Listings, Search, Media, Content, Analytics, Auth). Each module owns its database schema within a shared PostgreSQL instance (but logically separated). Use NATS JetStream for internal event communication between modules. Deploy as a single service initially, but structure code to allow extraction into microservices later.
+Start with a single NestJS application organized into well-defined modules (Listings, Search, Media, Content, Analytics, Auth). Each module owns its database schema within ONE shared PostgreSQL instance with strict ownership rules (no cross-schema queries allowed). Use NATS JetStream for internal event communication between modules. Deploy as a single service initially, but structure code to allow extraction into microservices later.
 
 **Pros:**
 - Faster initial development (no service orchestration overhead)
@@ -113,7 +113,7 @@ Start with a single NestJS application organized into well-defined modules (List
 ### Option B: Microservices from Day 1
 
 **Description:**
-Deploy separate NestJS services from the start: API Gateway, Listings Service, Search Service, Media Service, Content Service, Analytics Service, optionally Auth Service. Each service has its own PostgreSQL database. Services communicate via NATS JetStream events and REST APIs. Requires service mesh or API Gateway for routing.
+Deploy separate NestJS services from the start: API Gateway, Listings Service, Search Service, Media Service, Content Service, Analytics Service, optionally Auth Service. Each service has its own PostgreSQL database (DB-per-service architecture). Services communicate via NATS JetStream events and REST APIs. Requires service mesh or API Gateway for routing.
 
 **Pros:**
 - True independent scaling per service (e.g., scale Search service separately)
@@ -181,7 +181,7 @@ Even though starting with a monolith, the codebase will be structured to align w
 - **Auth Service (Optional):** OIDC/JWT, user management, RBAC for admin
 
 Each service will have:
-- Own PostgreSQL database (in monolith: separate schemas, ready for DB-per-service split)
+- Own PostgreSQL database (MVP: schema-per-module in ONE shared Postgres instance with strict ownership; Target: DB-per-service with separate database instances)
 - Defined REST API contracts (OpenAPI specs)
 - Event producers/consumers (NATS JetStream topics)
 - Independent deployment capability (Docker containers, Kubernetes pods)
@@ -323,9 +323,9 @@ GET    /v1/admin/search/analytics       → Search analytics dashboard
 ```json
 {
   "buildingId": "uuid",
-  "title": { "am": "...", "ru": "...", "en": "..." },
-  "address": { "am": "...", "ru": "...", "en": "..." },
-  "description": { "am": "...", "ru": "...", "en": "..." },
+  "title": { "am": "Նոր Բնակարանային Համալիր", "ru": "Новый Жилой Комплекс", "en": "New Residential Complex" },
+  "address": { "am": "Երևան, Արաբկիր", "ru": "Ереван, Арабкир", "en": "Yerevan, Arabkir" },
+  "description": { "am": "Նորակառույց բնակարանային համալիր", "ru": "Новостройка жилой комплекс", "en": "New construction residential complex" },
   "pricePerM2Min": 500000,
   "pricePerM2Max": 800000,
   "areaMin": 45,
@@ -333,9 +333,9 @@ GET    /v1/admin/search/analytics       → Search analytics dashboard
   "floors": 10,
   "commissioningDate": "2025-12-31",
   "developerId": "uuid",
-  "developerName": { "am": "...", "ru": "...", "en": "..." },
+  "developerName": { "am": "Դեվելոպեր ՍՊԸ", "ru": "Застройщик ООО", "en": "Developer LLC" },
   "regionId": "uuid",
-  "regionName": { "am": "...", "ru": "...", "en": "..." },
+  "regionName": { "am": "Արաբկիր", "ru": "Арабкир", "en": "Arabkir" },
   "location": { "lat": 40.1811, "lng": 44.5144 },
   "status": "published",
   "updatedAt": "2024-01-15T10:00:00Z"
@@ -565,7 +565,7 @@ PUT    /v1/admin/users/:id/roles        → Assign roles
 CREATE TABLE listings.buildings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   -- Multi-language fields (JSONB for flexibility, or separate translation table)
-  title JSONB NOT NULL, -- {"am": "...", "ru": "...", "en": "..."}
+  title JSONB NOT NULL, -- {"am": "Նոր Բնակարանային Համալիր", "ru": "Новый Жилой Комплекс", "en": "New Residential Complex"}
   description JSONB,
   address JSONB NOT NULL,
   
@@ -641,7 +641,7 @@ CREATE INDEX idx_buildings_status_region_price ON listings.buildings(status, reg
 ```sql
 CREATE TABLE listings.developers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name JSONB NOT NULL, -- {"am": "...", "ru": "...", "en": "..."}
+  name JSONB NOT NULL, -- {"am": "Դեվելոպեր ՍՊԸ", "ru": "Застройщик ООО", "en": "Developer LLC"}
   description JSONB,
   logo_media_id UUID, -- Reference to media.assets
   website_url VARCHAR(500),
@@ -660,7 +660,7 @@ CREATE INDEX idx_developers_name ON listings.developers USING GIN(name);
 ```sql
 CREATE TABLE listings.regions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name JSONB NOT NULL, -- {"am": "...", "ru": "...", "en": "..."}
+  name JSONB NOT NULL, -- {"am": "Արաբկիր", "ru": "Арабкир", "en": "Arabkir"}
   parent_region_id UUID REFERENCES listings.regions(id), -- For hierarchical regions (e.g., district → city)
   region_type VARCHAR(50) NOT NULL CHECK (region_type IN ('city', 'district', 'neighborhood')),
   boundary GEOGRAPHY(POLYGON, 4326), -- Optional: region boundary for map clustering
@@ -743,11 +743,11 @@ CREATE TABLE media.assets (
   object_key VARCHAR(500) NOT NULL, -- MinIO object key (path)
   width INTEGER, -- For images
   height INTEGER, -- For images
-  alt_text JSONB, -- {"am": "...", "ru": "...", "en": "..."}
+  alt_text JSONB, -- {"am": "Նկարի նկարագրություն", "ru": "Описание изображения", "en": "Image description"}
   caption JSONB,
   processing_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
   processing_error TEXT,
-  variants JSONB, -- {"thumbnail": "...", "small": "...", "medium": "...", "large": "..."} URLs
+  variants JSONB, -- {"thumbnail": "https://cdn.example.com/thumb.jpg", "small": "https://cdn.example.com/small.jpg", "medium": "https://cdn.example.com/medium.jpg", "large": "https://cdn.example.com/large.jpg"} URLs
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(bucket, object_key)
@@ -944,7 +944,9 @@ CREATE INDEX idx_buildings_title_ru ON listings.buildings USING GIN((title->'ru'
 -- Get title in specific language (with fallback)
 SELECT 
   COALESCE(title->>'am', title->>'ru', title->>'en') as title,
-  ...
+  address,
+  price_per_m2_min,
+  price_per_m2_max
 FROM listings.buildings
 WHERE status = 'published';
 ```
@@ -1017,8 +1019,8 @@ WHERE status = 'published';
   "data": [
     {
       "id": "uuid",
-      "title": { "am": "...", "ru": "...", "en": "..." },
-      "address": { "am": "...", "ru": "...", "en": "..." },
+      "title": { "am": "Նոր Բնակարանային Համալիր", "ru": "Новый Жилой Комплекс", "en": "New Residential Complex" },
+      "address": { "am": "Երևան, Արաբկիր", "ru": "Ереван, Арабкир", "en": "Yerevan, Arabkir" },
       "location": { "lat": 40.1811, "lng": 44.5144 },
       "pricePerM2Min": 500000,
       "pricePerM2Max": 800000,
@@ -1026,9 +1028,9 @@ WHERE status = 'published';
       "areaMax": 120,
       "floors": 10,
       "commissioningDate": "2025-12-31",
-      "developer": { "id": "uuid", "name": { "am": "...", "ru": "...", "en": "..." } },
-      "region": { "id": "uuid", "name": { "am": "...", "ru": "...", "en": "..." } },
-      "primaryImage": { "id": "uuid", "thumbnailUrl": "https://..." },
+      "developer": { "id": "uuid", "name": { "am": "Դեվելոպեր ՍՊԸ", "ru": "Застройщик ООО", "en": "Developer LLC" } },
+      "region": { "id": "uuid", "name": { "am": "Արաբկիր", "ru": "Арабкир", "en": "Arabkir" } },
+      "primaryImage": { "id": "uuid", "thumbnailUrl": "https://cdn.example.com/buildings/thumb.jpg" },
       "updatedAt": "2024-01-15T10:00:00Z"
     }
   ],
@@ -1057,9 +1059,9 @@ WHERE status = 'published';
 {
   "data": {
     "id": "uuid",
-    "title": { "am": "...", "ru": "...", "en": "..." },
-    "description": { "am": "...", "ru": "...", "en": "..." },
-    "address": { "am": "...", "ru": "...", "en": "..." },
+    "title": { "am": "Նոր Բնակարանային Համալիր", "ru": "Новый Жилой Комплекс", "en": "New Residential Complex" },
+    "description": { "am": "Նորակառույց բնակարանային համալիր Երևանում", "ru": "Новостройка жилой комплекс в Ереване", "en": "New construction residential complex in Yerevan" },
+    "address": { "am": "Երևան, Արաբկիր", "ru": "Ереван, Арабкир", "en": "Yerevan, Arabkir" },
     "location": { "lat": 40.1811, "lng": 44.5144 },
     "addressLine1": "Street 1",
     "addressLine2": "Building 5",
@@ -1076,32 +1078,32 @@ WHERE status = 'published';
     "currency": "AMD",
     "developer": {
       "id": "uuid",
-      "name": { "am": "...", "ru": "...", "en": "..." },
-      "description": { "am": "...", "ru": "...", "en": "..." },
+      "name": { "am": "Դեվելոպեր ՍՊԸ", "ru": "Застройщик ООО", "en": "Developer LLC" },
+      "description": { "am": "Վստահելի դեվելոպեր", "ru": "Надежный застройщик", "en": "Reliable developer" },
       "email": "developer@example.com",
       "phone": "+374 10 123456",
       "websiteUrl": "https://developer.com",
-      "logo": { "id": "uuid", "url": "https://..." }
+      "logo": { "id": "uuid", "url": "https://cdn.example.com/logos/developer.jpg" }
     },
     "region": {
       "id": "uuid",
-      "name": { "am": "...", "ru": "...", "en": "..." },
+      "name": { "am": "Արաբկիր", "ru": "Арабкир", "en": "Arabkir" },
       "regionType": "district"
     },
     "images": [
       {
         "id": "uuid",
-        "url": "https://...",
-        "thumbnailUrl": "https://...",
+        "url": "https://cdn.example.com/buildings/image.jpg",
+        "thumbnailUrl": "https://cdn.example.com/buildings/thumb.jpg",
         "displayOrder": 0,
         "isPrimary": true,
-        "altText": { "am": "...", "ru": "...", "en": "..." }
+        "altText": { "am": "Նորակառույց համալիրի լուսանկար", "ru": "Фото новостройки", "en": "New building complex photo" }
       }
     ],
     "externalLinks": {
       "developerWebsite": "https://developer.com",
-      "facebook": "https://facebook.com/...",
-      "instagram": "https://instagram.com/..."
+      "facebook": "https://facebook.com/developer",
+      "instagram": "https://instagram.com/developer"
     },
     "pricingHistory": [
       {
@@ -1159,13 +1161,13 @@ WHERE status = 'published';
 - **Request Body:**
 ```json
 {
-  "title": { "am": "...", "ru": "...", "en": "..." },
-  "address": { "am": "...", "ru": "...", "en": "..." },
+  "title": { "am": "Նոր Բնակարանային Համալիր", "ru": "Новый Жилой Комплекс", "en": "New Residential Complex" },
+  "address": { "am": "Երևան, Արաբկիր", "ru": "Ереван, Арабкир", "en": "Yerevan, Arabkir" },
   "location": { "lat": 40.1811, "lng": 44.5144 },
   "developerName": "Developer Name",
   "contactEmail": "submitter@example.com",
   "contactPhone": "+374 10 123456",
-  "notes": "Additional information..."
+  "notes": "Additional information about the building"
 }
 ```
 - **Response:**
@@ -1260,8 +1262,8 @@ WHERE status = 'published';
   "data": [
     {
       "id": "uuid",
-      "name": { "am": "...", "ru": "...", "en": "..." },
-      "logo": {...},
+      "name": { "am": "Դեվելոպեր ՍՊԸ", "ru": "Застройщик ООО", "en": "Developer LLC" },
+      "logo": {"id": "uuid", "url": "https://cdn.example.com/logos/developer.jpg"},
       "buildingCount": 15
     }
   ],
@@ -1284,10 +1286,10 @@ WHERE status = 'published';
   "data": [
     {
       "id": "uuid",
-      "name": { "am": "...", "ru": "...", "en": "..." },
-      "description": { "am": "...", "ru": "...", "en": "..." },
-      "logo": {...},
-      "websiteUrl": "https://...",
+      "name": { "am": "Դեվելոպեր ՍՊԸ", "ru": "Застройщик ООО", "en": "Developer LLC" },
+      "description": { "am": "Վստահելի դեվելոպեր", "ru": "Надежный застройщик", "en": "Reliable developer" },
+      "logo": {"id": "uuid", "url": "https://cdn.example.com/logos/developer.jpg"},
+      "websiteUrl": "https://developer.example.com",
       "email": "developer@example.com",
       "phone": "+374 10 123456",
       "buildingCount": 15,
@@ -1316,7 +1318,7 @@ WHERE status = 'published';
   "data": [
     {
       "id": "uuid",
-      "name": { "am": "...", "ru": "...", "en": "..." },
+      "name": { "am": "Արաբկիր", "ru": "Арабкир", "en": "Arabkir" },
       "regionType": "district",
       "parentRegionId": "uuid",
       "buildingCount": 45
@@ -1342,8 +1344,8 @@ WHERE status = 'published';
     {
       "id": "uuid",
       "slug": "article-slug",
-      "title": { "am": "...", "ru": "...", "en": "..." },
-      "excerpt": { "am": "...", "ru": "...", "en": "..." },
+      "title": { "am": "Բնակարանային շուկայի միտումներ", "ru": "Тенденции рынка недвижимости", "en": "Real Estate Market Trends" },
+      "excerpt": { "am": "Վերջին միտումները բնակարանային շուկայում", "ru": "Последние тенденции на рынке недвижимости", "en": "Latest trends in the real estate market" },
       "featuredImage": {...},
       "publishedAt": "2024-01-15T10:00:00Z",
       "author": { "id": "uuid", "name": "Admin User" }
@@ -1371,7 +1373,7 @@ WHERE status = 'published';
       "ogTitle": {...},
       "ogDescription": {...},
       "ogImage": {...},
-      "canonicalUrl": "https://...",
+      "canonicalUrl": "https://example.com/blog/article-slug",
       "structuredData": {...}
     },
     "publishedAt": "2024-01-15T10:00:00Z",
@@ -1463,7 +1465,7 @@ WHERE status = 'published';
   "sessionId": "anonymous-session-id",
   "metadata": {
     "source": "listing_page",
-    "referrer": "https://..."
+    "referrer": "https://example.com"
   }
 }
 ```
@@ -1507,9 +1509,9 @@ WHERE status = 'published';
 - **Request Body:**
 ```json
 {
-  "title": { "am": "...", "ru": "...", "en": "..." },
-  "description": { "am": "...", "ru": "...", "en": "..." },
-  "address": { "am": "...", "ru": "...", "en": "..." },
+  "title": { "am": "Նոր Բնակարանային Համալիր", "ru": "Новый Жилой Комплекс", "en": "New Residential Complex" },
+  "description": { "am": "Նորակառույց բնակարանային համալիր Երևանում", "ru": "Новостройка жилой комплекс в Ереване", "en": "New construction residential complex in Yerevan" },
+  "address": { "am": "Երևան, Արաբկիր", "ru": "Ереван, Арабкир", "en": "Yerevan, Arabkir" },
   "location": { "lat": 40.1811, "lng": 44.5144 },
   "floors": 10,
   "totalUnits": 120,
@@ -1524,9 +1526,9 @@ WHERE status = 'published';
   "regionId": "uuid",
   "status": "draft",
   "isFeatured": false,
-  "developerWebsiteUrl": "https://...",
-  "developerFacebookUrl": "https://...",
-  "developerInstagramUrl": "https://...",
+  "developerWebsiteUrl": "https://developer.example.com",
+  "developerFacebookUrl": "https://facebook.com/developer",
+  "developerInstagramUrl": "https://instagram.com/developer",
   "imageIds": ["uuid1", "uuid2"]
 }
 ```
@@ -1598,8 +1600,8 @@ WHERE status = 'published';
       "width": 1920,
       "height": 1080,
       "processingStatus": "completed",
-      "url": "https://...",
-      "thumbnailUrl": "https://...",
+      "url": "https://cdn.example.com/media/image.jpg",
+      "thumbnailUrl": "https://cdn.example.com/media/thumb.jpg",
       "variants": {...},
       "createdAt": "2024-01-15T10:00:00Z"
     }
@@ -1613,7 +1615,7 @@ WHERE status = 'published';
 - **Content-Type:** `multipart/form-data`
 - **Form Fields:**
   - `file` (file, required)
-  - `altText` (JSON string, optional) - `{"am": "...", "ru": "...", "en": "..."}`
+  - `altText` (JSON string, optional) - `{"am": "Նկարի նկարագրություն", "ru": "Описание изображения", "en": "Image description"}`
   - `caption` (JSON string, optional)
 - **Response:** Created media asset object
 
@@ -1640,9 +1642,9 @@ WHERE status = 'published';
 ```json
 {
   "slug": "article-slug",
-  "title": { "am": "...", "ru": "...", "en": "..." },
-  "excerpt": { "am": "...", "ru": "...", "en": "..." },
-  "body": { "am": "...", "ru": "...", "en": "..." },
+  "title": { "am": "Բնակարանային շուկայի միտումներ", "ru": "Тенденции рынка недвижимости", "en": "Real Estate Market Trends" },
+  "excerpt": { "am": "Վերջին միտումները բնակարանային շուկայում", "ru": "Последние тенденции на рынке недвижимости", "en": "Latest trends in the real estate market" },
+  "body": { "am": "Հոդվածի ամբողջական բովանդակությունը հայերենով", "ru": "Полное содержание статьи на русском", "en": "Full article content in English" },
   "featuredImageMediaId": "uuid",
   "status": "draft",
   "seoMetadata": {
@@ -1803,7 +1805,7 @@ WHERE status = 'published';
 
 **Cursor-Based Pagination (Optional, for Phase 2):**
 - For large datasets, consider cursor-based: `cursor` (string) and `limit`
-- Response: `{"nextCursor": "...", "hasMore": true}`
+- Response: `{"nextCursor": "eyJpZCI6InV1aWQiLCJjcmVhdGVkQXQiOiIyMDI0LTAxLTE1VDEwOjAwOjAwWiJ9", "hasMore": true}`
 
 ---
 
@@ -2048,7 +2050,7 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "buildingId": "uuid",
     "developerId": "uuid",
     "regionId": "uuid",
-    "title": { "am": "...", "ru": "...", "en": "..." },
+    "title": { "am": "Նոր Բնակարանային Համալիր", "ru": "Новый Жилой Комплекс", "en": "New Residential Complex" },
     "status": "draft",
     "location": { "lat": 40.1811, "lng": 44.5144 },
     "pricePerM2Min": 500000,
@@ -2151,7 +2153,7 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
   "aggregateType": "developer",
   "payload": {
     "developerId": "uuid",
-    "name": { "am": "...", "ru": "...", "en": "..." },
+    "name": { "am": "Դեվելոպեր ՍՊԸ", "ru": "Застройщик ООО", "en": "Developer LLC" },
     "email": "developer@example.com",
     "phone": "+374 10 123456"
   },
@@ -2305,7 +2307,7 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "sessionId": "anonymous-session-id",
     "metadata": {
       "source": "listing_page",
-      "referrer": "https://..."
+      "referrer": "https://example.com"
     }
   },
   "metadata": { ... }
@@ -3317,7 +3319,7 @@ const switchLanguage = (lang: 'am' | 'ru' | 'en') => {
 ```
 
 4. **API Response Handling:**
-- API returns multi-language JSONB fields: `{ "am": "...", "ru": "...", "en": "..." }`
+- API returns multi-language JSONB fields: `{ "am": "Նորակառույց", "ru": "Новостройка", "en": "New Building" }`
 - Frontend extracts appropriate language:
 ```typescript
 const getLocalizedText = (text: MultiLangText, locale: string): string => {
@@ -8855,7 +8857,6 @@ This checklist is designed for reviewers (tech leads, architects, QA, product ow
 - [ ] **P0** Backend uses NestJS (TypeScript) with microservices-first mindset
 - [ ] **P0** Frontend uses Nuxt 3 (TypeScript) with SSR enabled
 - [ ] **P0** PostgreSQL + PostGIS is used for spatial data
-- [ ] **P0** Database isolation: Schema-per-module pattern enforced in MVP (each module owns its schema), ready for DB-per-service extraction
 - [ ] **P0** NATS JetStream is used as message broker
 - [ ] **P0** Meilisearch is used for search functionality
 - [ ] **P0** Redis is used for cache and rate limiting
@@ -8877,7 +8878,7 @@ This checklist is designed for reviewers (tech leads, architects, QA, product ow
 - [ ] **P1** Auth service implements JWT/OIDC (if Phase 2)
 
 #### 13.2.2 Database & Data Model
-- [ ] **P0** All modules have their own PostgreSQL schema (MVP: shared instance, schemas separated; Future: DB-per-service)
+- [ ] **P0** Database isolation: MVP uses schema-per-module in ONE shared PostgreSQL instance (strict ownership, no cross-schema queries). Target architecture is microservices with DB-per-service.
 - [ ] **P0** PostGIS extension is enabled and spatial queries work
 - [ ] **P0** Database migrations are versioned and reversible
 - [ ] **P0** Required indexes are created (including PostGIS spatial indexes)
@@ -9268,6 +9269,70 @@ This checklist is designed for reviewers (tech leads, architects, QA, product ow
 ---
 
 **ASSUMPTION:** This checklist is a living document and should be updated as requirements evolve. Reviewers should use this checklist systematically to ensure nothing is missed before production deployment.
+
+---
+
+## 14. Consistency Checks
+
+This section provides grep/ripgrep commands to verify internal consistency of the README. All commands should return ZERO hits when the document is consistent.
+
+### 14.1 Database Architecture Consistency
+
+**Check for banned phrase (must return zero results):**
+```bash
+grep -i "DB-per-service architecture (no shared databases)" README.md
+# Expected: No matches
+```
+
+**Verify database stance consistency:**
+```bash
+# Should find consistent mentions of MVP = schema-per-module in ONE shared Postgres
+grep -i "schema-per-module.*shared.*Postgres" README.md
+# Should find consistent mentions of target = DB-per-service
+grep -i "target.*DB-per-service\|microservices.*DB-per-service" README.md
+```
+
+### 14.2 Placeholder Consistency
+
+**Check for standalone "..." lines (must return zero results):**
+```bash
+grep -E "^\.\.\.$" README.md
+# Expected: No matches
+```
+
+**Check for literal "..." in JSON string values (should be replaced with concrete examples):**
+```bash
+grep -E '"[^"]*":\s*"[^"]*\.\.\.[^"]*"' README.md
+# Expected: No matches (except in comments explaining placeholder notation)
+```
+
+**Note:** Object placeholders like `{...}` and array placeholders like `[...]` in JSON examples are acceptable as they represent structure placeholders, not literal string values.
+
+### 14.3 Truncated Fragment Check
+
+**Check for truncated fragments (must return zero results):**
+```bash
+grep -E "[a-z]\.\.\.[a-z]" README.md
+# Expected: No matches
+```
+
+### 14.4 Running Consistency Checks
+
+Run these commands before committing changes to ensure README.md remains internally consistent:
+
+```bash
+# Full consistency check
+echo "Checking for banned phrases..."
+grep -i "DB-per-service architecture (no shared databases)" README.md && echo "ERROR: Banned phrase found!" || echo "✓ No banned phrases"
+
+echo "Checking for standalone '...' lines..."
+grep -E "^\.\.\.$" README.md && echo "ERROR: Standalone '...' found!" || echo "✓ No standalone '...' lines"
+
+echo "Checking for truncated fragments..."
+grep -E "[a-z]\.\.\.[a-z]" README.md && echo "ERROR: Truncated fragments found!" || echo "✓ No truncated fragments"
+```
+
+**ASSUMPTION:** All consistency checks pass before the README is considered ready for use.
 
 ---
 
