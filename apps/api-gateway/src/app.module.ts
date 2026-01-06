@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { TerminusModule } from '@nestjs/terminus';
+import { HttpModule } from '@nestjs/axios';
 import { HealthController } from './health/health.controller';
+import { TcpHealthIndicator } from './health/tcp-health.indicator';
 
 @Module({
   imports: [
@@ -8,8 +11,11 @@ import { HealthController } from './health/health.controller';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    TerminusModule,
+    HttpModule,
   ],
   controllers: [HealthController],
+  providers: [TcpHealthIndicator],
 })
 export class AppModule {}
 
