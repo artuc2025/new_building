@@ -24,9 +24,9 @@ else
     echo "✓ No banned phrases"
 fi
 
-# Check 2: Standalone "..." lines (must return zero results)
+# Check 2: Standalone "..." lines with optional whitespace (must return zero results)
 echo "Checking for standalone '...' lines..."
-if grep -E "^\.\.\.$" "$README_FILE" | grep -v "## 14. Consistency Checks" | grep -v "grep -E" | grep -v "scripts/readme_checks.sh" | grep -v "The script verifies" > /dev/null; then
+if grep -E "^[[:space:]]*\.\.\.[[:space:]]*$" "$README_FILE" | grep -v "## 14. Consistency Checks" | grep -v "grep -E" | grep -v "scripts/readme_checks.sh" | grep -v "The script verifies" > /dev/null; then
     echo "ERROR: Standalone '...' found!"
     exit 1
 else
@@ -42,14 +42,33 @@ else
     echo "✓ No truncated fragments"
 fi
 
-# Check 4: Verify database stance consistency
+# Check 4: Invalid JSON placeholder patterns (must return zero results)
+echo "Checking for invalid JSON placeholder patterns..."
+if grep -E "\{\.\}|\{ \.\}|\{\. \}" "$README_FILE" | grep -v "## 14. Consistency Checks" | grep -v "grep -E" | grep -v "scripts/readme_checks.sh" | grep -v "The script verifies" | grep -v "invalid placeholder patterns" > /dev/null; then
+    echo "ERROR: Invalid JSON placeholder patterns like '{.}' or '{ . }' found!"
+    exit 1
+else
+    echo "✓ No invalid JSON placeholder patterns"
+fi
+
+# Check 5: Invalid metadata placeholder patterns (must return zero results)
+echo "Checking for invalid metadata placeholder patterns..."
+if grep -iE "metadata:[[:space:]]*\{[[:space:]]*\.[[:space:]]*\}" "$README_FILE" | grep -v "## 14. Consistency Checks" | grep -v "grep -iE" | grep -v "scripts/readme_checks.sh" | grep -v "The script verifies" | grep -v "invalid metadata placeholder" > /dev/null; then
+    echo "ERROR: Invalid metadata placeholder patterns like 'metadata: { . }' found!"
+    exit 1
+else
+    echo "✓ No invalid metadata placeholder patterns"
+fi
+
+# Check 6: Verify database stance consistency (must be consistent)
 echo "Verifying database stance consistency..."
 SCHEMA_MENTIONS=$(grep -i "schema-per-module.*shared.*Postgres" "$README_FILE" | wc -l)
 DB_SERVICE_MENTIONS=$(grep -i "target.*DB-per-service\|microservices.*DB-per-service" "$README_FILE" | wc -l)
 if [ "$SCHEMA_MENTIONS" -gt 0 ] && [ "$DB_SERVICE_MENTIONS" -gt 0 ]; then
     echo "✓ Database stance is consistent (MVP = schema-per-module, target = DB-per-service)"
 else
-    echo "WARNING: Database stance mentions may be inconsistent"
+    echo "ERROR: Database stance mentions may be inconsistent"
+    exit 1
 fi
 
 echo ""

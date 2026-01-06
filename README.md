@@ -2093,7 +2093,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "updatedFields": ["pricePerM2Min", "pricePerM2Max"],
     "updatedAt": "2024-01-15T10:00:00Z"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "listings-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2109,7 +2115,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "publishedAt": "2024-01-15T10:00:00Z",
     "status": "published"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "listings-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2125,7 +2137,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "deletedAt": "2024-01-15T10:00:00Z",
     "status": "archived"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "listings-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2147,7 +2165,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "previousPricePerM2Max": 800000,
     "priceChangePercent": 4.0
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "listings-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2164,7 +2188,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "email": "developer@example.com",
     "phone": "+374 10 123456"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "listings-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2189,7 +2219,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "width": 1920,
     "height": 1080
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "media-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2231,7 +2267,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     ],
     "thumbnailUrl": "https://cdn.example.com/media/thumbnail.jpg"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "media-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2249,7 +2291,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "retryCount": 2,
     "maxRetries": 3
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "media-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2270,7 +2318,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "status": "success",
     "indexedAt": "2024-01-15T10:00:00Z"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "search-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2317,7 +2371,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
       "referrer": "https://example.com"
     }
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "analytics-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2337,7 +2397,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "periodStart": "2024-01-15T00:00:00Z",
     "periodEnd": "2024-01-16T00:00:00Z"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "analytics-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2358,7 +2424,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "status": "draft",
     "authorId": "admin-uuid"
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "content-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 
@@ -2378,7 +2450,13 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
       "canonicalUrl": "https://example.com/blog/article-slug"
     }
   },
-  "metadata": { ... }
+  "metadata": {
+    "timestamp": "2024-01-15T10:00:00Z",
+    "source": "content-service",
+    "version": "1.0",
+    "correlationId": "req-uuid",
+    "causationId": "event-uuid"
+  }
 }
 ```
 

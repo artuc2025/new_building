@@ -1,0 +1,6 @@
+# Ensure LF line endings for shell scripts
+*.sh text eol=lf
+
+# Ensure LF line endings for markdown files
+*.md text eol=lf
+
