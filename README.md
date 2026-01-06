@@ -11,7 +11,7 @@
 - Security: Helmet/CORS, RBAC, audit logs, backups
 
 **Non-Negotiables:**
-- DB-per-service architecture (no shared databases)
+- Database isolation: Schema-per-module in MVP (modular monolith), DB-per-service in microservices phase (target architecture)
 - Contract-first APIs (OpenAPI) with versioning
 - Eventing: Outbox pattern, idempotency, retries, DLQ
 - SSR + SEO optimization required
@@ -244,9 +244,10 @@ GET    /v1/admin/analytics/dashboard    → Auth check → Aggregate from Analyt
 - Filtering and sorting logic (before passing to Search Service for full-text)
 - Currency conversion (AMD/USD) with rounding rules
 - Favorites management (if authenticated; anonymous handled client-side)
+- PostGIS geospatial data ownership (location coordinates, spatial indexes)
 
 **Owned DB Schema:**
-- `listings.buildings` (main table with PostGIS geometry)
+- `listings.buildings` (main table with PostGIS geometry - owned by Listings, queried by Search for map bounds)
 - `listings.developers`
 - `listings.regions` (administrative regions, districts)
 - `listings.pricing_snapshots` (historical pricing data)
@@ -291,7 +292,7 @@ POST   /v1/admin/buildings/:id/publish  → Publish/unpublish
 - Full-text search queries (buildings, developers)
 - Search result ranking and relevance tuning
 - Search analytics (popular queries, zero-result queries)
-- Geospatial search (PostGIS integration for map bounds queries)
+- Geospatial search for map bounds queries (queries Listings schema PostGIS data via direct schema access in monolith, or via Listings API in microservices)
 - Faceted search (filters: price, area, region, developer)
 
 **Owned DB Schema:**
@@ -959,7 +960,7 @@ WHERE status = 'published';
 - Developers: Seed with known developers (if data available)
 - Sample buildings: 10-20 sample buildings for development/testing
 
-**Migration Tool:** Use NestJS TypeORM or Prisma migrations (ASSUMPTION: TypeORM for NestJS compatibility).
+**Migration Tool:** Use NestJS TypeORM migrations (native NestJS integration, supports PostGIS).
 
 **Seed Scripts:**
 - `npm run seed:regions` → Load regions from JSON/CSV
@@ -3821,7 +3822,7 @@ new-building-portal/
 │   │
 │   ├── listings-service/         # Listings Service (NestJS)
 │   │   ├── src/
-│   │   ├── prisma/               # Prisma schema (or TypeORM migrations)
+│   │   ├── migrations/            # TypeORM migrations
 │   │   ├── Dockerfile
 │   │   ├── package.json
 │   │   └── tsconfig.json
@@ -4347,7 +4348,7 @@ pnpm nx run listings-service:typeorm -- migration:run
 pnpm nx run listings-service:typeorm -- migration:revert
 ```
 
-**ASSUMPTION:** Each service manages its own migrations. Use TypeORM or Prisma based on service preference (consistent within service).
+**ASSUMPTION:** Each service/module manages its own migrations using TypeORM (consistent across all services).
 
 ---
 
@@ -6288,7 +6289,7 @@ receivers:
 **Application Security:**
 
 - [ ] **Input Validation:** All endpoints validate input using `class-validator` and `class-transformer`
-- [ ] **SQL Injection Prevention:** Use parameterized queries (TypeORM/Prisma), never string concatenation
+- [ ] **SQL Injection Prevention:** Use parameterized queries (TypeORM), never string concatenation
 - [ ] **XSS Prevention:** Sanitize user input, use CSP headers, escape output in templates
 - [ ] **CSRF Protection:** CSRF tokens for state-changing operations (if using cookies)
 - [ ] **Rate Limiting:** Implement per-IP and per-user rate limits (Redis-based)
@@ -8133,7 +8134,7 @@ jobs:
 **Deliverables:**
 1. PostgreSQL schemas for all core entities (Buildings, Developers, Regions, PricingSnapshots, Blog, Media)
 2. PostGIS extension enabled and spatial indexes created
-3. TypeORM entities (or Prisma schemas) for all tables
+3. TypeORM entities for all tables
 4. Database migrations (initial schema)
 5. Seed script with sample data (10-20 buildings, 3-5 developers, 5-10 blog articles)
 6. Composite indexes for common query patterns
@@ -8207,7 +8208,7 @@ jobs:
 6. Faceted search: aggregations for filters (price ranges, developers, regions)
 
 **Acceptance Criteria:**
-- [ ] Building created → indexed in Meilisearch within 5 seconds
+- [ ] Building created → indexed in Meilisearch (SLO: p95 < 10 seconds, p99 < 30 seconds)
 - [ ] Building updated → Meilisearch index updated
 - [ ] Building deleted → removed from Meilisearch index
 - [ ] GET /search/buildings?q=apartment returns relevant results
@@ -8542,6 +8543,8 @@ jobs:
 7. Retry logic: exponential backoff for failed event processing
 8. DLQ: dead letter queue for poison messages (failed after N retries)
 9. Event catalog: document all events (name, payload schema, producer, consumers)
+10. Alerting: configure alerts for event processing failures (SLO violations, DLQ growth)
+11. Reindex strategy: document and implement procedure for reindexing Meilisearch when events are missed or corrupted
 
 **Acceptance Criteria:**
 - [ ] Building created → outbox event created → published to NATS → search service updates Meilisearch
@@ -8549,7 +8552,7 @@ jobs:
 - [ ] Failed events retried with exponential backoff (max 3 retries)
 - [ ] Poison messages moved to DLQ after max retries
 - [ ] Idempotency: duplicate events ignored (based on idempotency key)
-- [ ] Event processing is eventually consistent (Meilisearch updated within 10 seconds)
+- [ ] Event processing SLO: p95 latency < 10 seconds for Meilisearch index updates (p99 < 30 seconds). Alerting configured for failures. Reindex strategy documented for missed events.
 
 **Dependencies:**
 - Sprint 3 completed (search service)
@@ -8852,7 +8855,7 @@ This checklist is designed for reviewers (tech leads, architects, QA, product ow
 - [ ] **P0** Backend uses NestJS (TypeScript) with microservices-first mindset
 - [ ] **P0** Frontend uses Nuxt 3 (TypeScript) with SSR enabled
 - [ ] **P0** PostgreSQL + PostGIS is used for spatial data
-- [ ] **P0** DB-per-service pattern is enforced (no shared databases)
+- [ ] **P0** Database isolation: Schema-per-module pattern enforced in MVP (each module owns its schema), ready for DB-per-service extraction
 - [ ] **P0** NATS JetStream is used as message broker
 - [ ] **P0** Meilisearch is used for search functionality
 - [ ] **P0** Redis is used for cache and rate limiting
@@ -8874,7 +8877,7 @@ This checklist is designed for reviewers (tech leads, architects, QA, product ow
 - [ ] **P1** Auth service implements JWT/OIDC (if Phase 2)
 
 #### 13.2.2 Database & Data Model
-- [ ] **P0** All services have their own PostgreSQL database
+- [ ] **P0** All modules have their own PostgreSQL schema (MVP: shared instance, schemas separated; Future: DB-per-service)
 - [ ] **P0** PostGIS extension is enabled and spatial queries work
 - [ ] **P0** Database migrations are versioned and reversible
 - [ ] **P0** Required indexes are created (including PostGIS spatial indexes)
