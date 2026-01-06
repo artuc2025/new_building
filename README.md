@@ -565,6 +565,8 @@ PUT    /v1/admin/users/:id/roles        → Assign roles
 
 ### 4.2 Database Schema (PostgreSQL + PostGIS)
 
+**Note:** Database schema design applies to both **(MVP)** (schema-per-module in ONE shared Postgres instance) and **(Target)** (DB-per-service with separate database instances). Schema ownership and isolation rules are enforced in both cases.
+
 #### 4.2.1 Listings Service Schema
 
 **`listings.buildings`**
@@ -4024,11 +4026,13 @@ new-building-portal/
 - **Apps:** Runnable applications (services, frontend, workers)
 - **Libs:** Reusable code shared across services (no business logic, only utilities/contracts)
 - **Tools:** Development-time scripts and utilities
-- **Service Isolation:** Each service has its own `package.json`, `Dockerfile`, and database schema
+- **Service Isolation:** Each service has its own `package.json`, `Dockerfile`, and database schema **(MVP:** schema-per-module in ONE shared Postgres instance; **Target:** DB-per-service with separate database instances)
 
 ---
 
 ### 8.3 Docker Compose Stack (Local Development)
+
+**Note:** The docker-compose configuration below shows the **(Target)** architecture with separate PostgreSQL instances per service (DB-per-service). For **(MVP)**, use a single shared PostgreSQL instance with schema-per-module (see Section 2 for details).
 
 **File: `docker-compose.yml`**
 
@@ -4036,7 +4040,7 @@ new-building-portal/
 version: '3.8'
 
 services:
-  # PostgreSQL with PostGIS
+  # PostgreSQL with PostGIS (Target: DB-per-service)
   postgres-listings:
     image: postgis/postgis:15-3.3
     container_name: postgres-listings
@@ -4266,22 +4270,22 @@ docker-compose down -v
 
 | Variable | Service/App | Description | Example | Required |
 |----------|-------------|-------------|---------|----------|
-| **Database (Listings Service)** |
+| **Database (Listings Service) (Target: DB-per-service; MVP: shared Postgres with `listings` schema)** |
 | `LISTINGS_DB_HOST` | listings-service | PostgreSQL host | `localhost` | ✅ |
 | `LISTINGS_DB_PORT` | listings-service | PostgreSQL port | `5432` | ✅ |
-| `LISTINGS_DB_NAME` | listings-service | Database name | `listings_db` | ✅ |
+| `LISTINGS_DB_NAME` | listings-service | Database name | `listings_db` **(Target)** or shared DB name **(MVP)** | ✅ |
 | `LISTINGS_DB_USER` | listings-service | Database user | `listings_user` | ✅ |
 | `LISTINGS_DB_PASSWORD` | listings-service | Database password | `listings_pass` | ✅ |
-| **Database (Content Service)** |
+| **Database (Content Service) (Target: DB-per-service; MVP: shared Postgres with `content` schema)** |
 | `CONTENT_DB_HOST` | content-service | PostgreSQL host | `localhost` | ✅ |
-| `CONTENT_DB_PORT` | content-service | PostgreSQL port | `5433` | ✅ |
-| `CONTENT_DB_NAME` | content-service | Database name | `content_db` | ✅ |
+| `CONTENT_DB_PORT` | content-service | PostgreSQL port | `5433` **(Target)** or same as Listings port **(MVP)** | ✅ |
+| `CONTENT_DB_NAME` | content-service | Database name | `content_db` **(Target)** or shared DB name **(MVP)** | ✅ |
 | `CONTENT_DB_USER` | content-service | Database user | `content_user` | ✅ |
 | `CONTENT_DB_PASSWORD` | content-service | Database password | `content_pass` | ✅ |
-| **Database (Analytics Service)** |
+| **Database (Analytics Service) (Target: DB-per-service; MVP: shared Postgres with `analytics` schema)** |
 | `ANALYTICS_DB_HOST` | analytics-service | PostgreSQL host | `localhost` | ✅ |
-| `ANALYTICS_DB_PORT` | analytics-service | PostgreSQL port | `5434` | ✅ |
-| `ANALYTICS_DB_NAME` | analytics-service | Database name | `analytics_db` | ✅ |
+| `ANALYTICS_DB_PORT` | analytics-service | PostgreSQL port | `5434` **(Target)** or same as Listings port **(MVP)** | ✅ |
+| `ANALYTICS_DB_NAME` | analytics-service | Database name | `analytics_db` **(Target)** or shared DB name **(MVP)** | ✅ |
 | `ANALYTICS_DB_USER` | analytics-service | Database user | `analytics_user` | ✅ |
 | `ANALYTICS_DB_PASSWORD` | analytics-service | Database password | `analytics_pass` | ✅ |
 | **Redis** |
@@ -8220,7 +8224,7 @@ jobs:
 **Duration:** 2 weeks
 
 **Deliverables:**
-1. PostgreSQL schemas for all core entities (Buildings, Developers, Regions, PricingSnapshots, Blog, Media)
+1. PostgreSQL schemas for all core entities (Buildings, Developers, Regions, PricingSnapshots, Blog, Media) **(MVP:** schema-per-module in ONE shared Postgres instance; **Target:** DB-per-service with separate database instances)
 2. PostGIS extension enabled and spatial indexes created
 3. TypeORM entities for all tables
 4. Database migrations (initial schema)
