@@ -292,8 +292,14 @@ POST   /v1/admin/buildings/:id/publish  → Publish/unpublish
 - Full-text search queries (buildings, developers)
 - Search result ranking and relevance tuning
 - Search analytics (popular queries, zero-result queries)
-- Geospatial search for map bounds queries (uses Search-owned read-model populated via events from Listings Service, or calls Listings Service API for geospatial queries in microservices)
+- Geospatial search for map bounds queries (uses Search-owned read-model `search.building_locations` populated via events from Listings Service)
 - Faceted search (filters: price, area, region, developer)
+
+**Service Boundary Rules:**
+- **MUST NOT** query `listings.*` schema directly (strict database isolation)
+- **MUST** use event-driven read-model (`search.building_locations`) for all geospatial queries
+- **MUST** populate read-model by consuming `listings.building.*` events
+- All map bounds queries handled via `search.building_locations` table using PostGIS
 
 **Owned DB Schema:**
 - `search.search_analytics` (query logs, result counts, zero-result tracking)
@@ -1223,7 +1229,7 @@ WHERE status = 'published';
 ```
 
 **`GET /v1/search/buildings/map`**
-- **Description:** Geospatial search for map view (bounding box)
+- **Description:** Geospatial search for map view (bounding box). Uses Search Service's own `search.building_locations` read-model (populated via events from Listings Service). Does NOT query `listings.*` schema directly.
 - **Query Parameters:**
   - `bounds` (string, required) - `"southwest_lat,southwest_lng,northeast_lat,northeast_lng"`
   - `zoom` (integer, optional, 1-18) - map zoom level (for clustering)
@@ -1654,7 +1660,7 @@ WHERE status = 'published';
     "ogTitle": {...},
     "ogDescription": {...},
     "ogImageMediaId": "uuid",
-    "canonicalUrl": "https://...",
+    "canonicalUrl": "https://example.com/buildings/uuid",
     "structuredData": {...}
   }
 }
@@ -2202,28 +2208,28 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
         "size": "thumbnail",
         "width": 150,
         "height": 150,
-        "url": "https://.../thumbnail.jpg"
+        "url": "https://cdn.example.com/media/thumbnail.jpg"
       },
       {
         "size": "small",
         "width": 300,
         "height": 300,
-        "url": "https://.../small.jpg"
+        "url": "https://cdn.example.com/media/small.jpg"
       },
       {
         "size": "medium",
         "width": 800,
         "height": 800,
-        "url": "https://.../medium.jpg"
+        "url": "https://cdn.example.com/media/medium.jpg"
       },
       {
         "size": "large",
         "width": 1200,
         "height": 1200,
-        "url": "https://.../large.jpg"
+        "url": "https://cdn.example.com/media/large.jpg"
       }
     ],
-    "thumbnailUrl": "https://.../thumbnail.jpg"
+    "thumbnailUrl": "https://cdn.example.com/media/thumbnail.jpg"
   },
   "metadata": { ... }
 }
@@ -2369,7 +2375,7 @@ const response = await buildingsApi.listBuildings({ page: 1, limit: 20 })
     "publishedAt": "2024-01-15T10:00:00Z",
     "seoMetadata": {
       "metaTitle": {...},
-      "canonicalUrl": "https://..."
+      "canonicalUrl": "https://example.com/blog/article-slug"
     }
   },
   "metadata": { ... }
@@ -2650,9 +2656,10 @@ streams:
 
 **Implementation:**
 - Building created/updated → `listings.building.*` events
-- Search Service consumes events → Updates Meilisearch index
+- Search Service consumes events → Updates Meilisearch index AND `search.building_locations` read-model
 - **Delay:** 1-5 seconds (outbox processing + event delivery)
 - **Acceptable:** Search results may be slightly stale (acceptable for read-heavy workload)
+- **Note:** Search Service does NOT query `listings.*` schema directly. All data syncs via events to Search-owned read-model.
 
 **Mitigation:**
 - For critical updates (publish/unpublish), consider synchronous index update (optional)
@@ -8205,10 +8212,12 @@ jobs:
 **Deliverables:**
 1. Search module (NestJS): Meilisearch client integration
 2. Index synchronization: building data syncs to Meilisearch on create/update/delete
-3. Search endpoints: GET /search/buildings?q=... with filters
-4. Event-driven sync: NATS events trigger Meilisearch updates (or direct sync for MVP)
-5. Search result ranking configuration (price, date, relevance)
-6. Faceted search: aggregations for filters (price ranges, developers, regions)
+3. Read-model synchronization: `search.building_locations` table populated via events for geospatial queries
+4. Search endpoints: GET /search/buildings?q=... with filters, GET /search/buildings/map for map bounds queries
+5. Event-driven sync: NATS events trigger Meilisearch updates AND read-model updates (or direct sync for MVP)
+6. Search result ranking configuration (price, date, relevance)
+7. Faceted search: aggregations for filters (price ranges, developers, regions)
+8. **Service boundary enforcement:** Search Service does NOT query `listings.*` schema directly
 
 **Acceptance Criteria:**
 - [ ] Building created → indexed in Meilisearch (SLO: p95 < 10 seconds, p99 < 30 seconds)
@@ -9275,63 +9284,41 @@ This checklist is designed for reviewers (tech leads, architects, QA, product ow
 
 ## 14. Consistency Checks
 
-This section provides grep/ripgrep commands to verify internal consistency of the README. All commands should return ZERO hits when the document is consistent.
+This section provides automated checks to verify internal consistency of the README. All checks should return ZERO hits when the document is consistent.
 
 ### 14.1 Database Architecture Consistency
 
 **Check for banned phrase (must return zero results):**
-```bash
-grep -i "DB-per-service architecture (no shared databases)" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -i"
-# Expected: No matches
-```
+The consistency check script verifies that the banned phrase "DB-per-service architecture (no shared databases)" does not appear in the README (except in the consistency checks section itself).
 
 **Verify database stance consistency:**
-```bash
-# Should find consistent mentions of MVP = schema-per-module in ONE shared Postgres
-grep -i "schema-per-module.*shared.*Postgres" README.md
-# Should find consistent mentions of target = DB-per-service
-grep -i "target.*DB-per-service\|microservices.*DB-per-service" README.md
-```
+The script also verifies that the README consistently mentions:
+- MVP = schema-per-module in ONE shared Postgres
+- Target = DB-per-service for microservices
 
 ### 14.2 Placeholder Consistency
 
 **Check for standalone "..." lines (must return zero results):**
-```bash
-grep -E "^\.\.\.$" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E"
-# Expected: No matches
-```
+The script verifies that no standalone lines containing only "..." exist in the README.
 
-**Check for literal "..." in JSON string values (should be replaced with concrete examples):**
-```bash
-grep -E '"[^"]*":\s*"[^"]*\.\.\.[^"]*"' README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E"
-# Expected: No matches (except in comments explaining placeholder notation)
-```
+**Check for truncated fragments:**
+The script verifies that no truncated fragments like "REA...echo" or "enfo...ach" exist in the README.
 
 **Note:** Object placeholders like `{...}` and array placeholders like `[...]` in JSON examples are acceptable as they represent structure placeholders, not literal string values.
 
-### 14.3 Truncated Fragment Check
+### 14.3 Running Consistency Checks
 
-**Check for truncated fragments (must return zero results):**
-```bash
-grep -E "[a-z]\.\.\.[a-z]" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E"
-# Expected: No matches
-```
-
-### 14.4 Running Consistency Checks
-
-Run these commands before committing changes to ensure README.md remains internally consistent:
+Run the consistency check script before committing changes to ensure README.md remains internally consistent:
 
 ```bash
-# Full consistency check
-echo "Checking for banned phrases..."
-grep -i "DB-per-service architecture (no shared databases)" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -i" && echo "ERROR: Banned phrase found!" || echo "✓ No banned phrases"
-
-echo "Checking for standalone '...' lines..."
-grep -E "^\.\.\.$" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E" && echo "ERROR: Standalone '...' found!" || echo "✓ No standalone '...' lines"
-
-echo "Checking for truncated fragments..."
-grep -E "[a-z]\.\.\.[a-z]" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E" && echo "ERROR: Truncated fragments found!" || echo "✓ No truncated fragments"
+./scripts/readme_checks.sh
 ```
+
+The script performs the following checks:
+1. Verifies no banned phrases are present
+2. Verifies no standalone "..." lines exist
+3. Verifies no truncated fragments exist
+4. Verifies database stance consistency
 
 **ASSUMPTION:** All consistency checks pass before the README is considered ready for use.
 
