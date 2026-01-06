@@ -247,7 +247,7 @@ GET    /v1/admin/analytics/dashboard    → Auth check → Aggregate from Analyt
 - PostGIS geospatial data ownership (location coordinates, spatial indexes)
 
 **Owned DB Schema:**
-- `listings.buildings` (main table with PostGIS geometry - owned by Listings, queried by Search for map bounds)
+- `listings.buildings` (main table with PostGIS geometry - owned by Listings Service only)
 - `listings.developers`
 - `listings.regions` (administrative regions, districts)
 - `listings.pricing_snapshots` (historical pricing data)
@@ -292,12 +292,13 @@ POST   /v1/admin/buildings/:id/publish  → Publish/unpublish
 - Full-text search queries (buildings, developers)
 - Search result ranking and relevance tuning
 - Search analytics (popular queries, zero-result queries)
-- Geospatial search for map bounds queries (queries Listings schema PostGIS data via direct schema access in monolith, or via Listings API in microservices)
+- Geospatial search for map bounds queries (uses Search-owned read-model populated via events from Listings Service, or calls Listings Service API for geospatial queries in microservices)
 - Faceted search (filters: price, area, region, developer)
 
 **Owned DB Schema:**
 - `search.search_analytics` (query logs, result counts, zero-result tracking)
 - `search.index_sync_status` (last sync timestamp, sync errors)
+- `search.building_locations` (read-model for geospatial queries: building_id, location PostGIS geometry, synced via events from Listings Service)
 
 **Key REST Endpoints:**
 ```
@@ -9280,7 +9281,7 @@ This section provides grep/ripgrep commands to verify internal consistency of th
 
 **Check for banned phrase (must return zero results):**
 ```bash
-grep -i "DB-per-service architecture (no shared databases)" README.md
+grep -i "DB-per-service architecture (no shared databases)" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -i"
 # Expected: No matches
 ```
 
@@ -9296,13 +9297,13 @@ grep -i "target.*DB-per-service\|microservices.*DB-per-service" README.md
 
 **Check for standalone "..." lines (must return zero results):**
 ```bash
-grep -E "^\.\.\.$" README.md
+grep -E "^\.\.\.$" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E"
 # Expected: No matches
 ```
 
 **Check for literal "..." in JSON string values (should be replaced with concrete examples):**
 ```bash
-grep -E '"[^"]*":\s*"[^"]*\.\.\.[^"]*"' README.md
+grep -E '"[^"]*":\s*"[^"]*\.\.\.[^"]*"' README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E"
 # Expected: No matches (except in comments explaining placeholder notation)
 ```
 
@@ -9312,7 +9313,7 @@ grep -E '"[^"]*":\s*"[^"]*\.\.\.[^"]*"' README.md
 
 **Check for truncated fragments (must return zero results):**
 ```bash
-grep -E "[a-z]\.\.\.[a-z]" README.md
+grep -E "[a-z]\.\.\.[a-z]" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E"
 # Expected: No matches
 ```
 
@@ -9323,13 +9324,13 @@ Run these commands before committing changes to ensure README.md remains interna
 ```bash
 # Full consistency check
 echo "Checking for banned phrases..."
-grep -i "DB-per-service architecture (no shared databases)" README.md && echo "ERROR: Banned phrase found!" || echo "✓ No banned phrases"
+grep -i "DB-per-service architecture (no shared databases)" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -i" && echo "ERROR: Banned phrase found!" || echo "✓ No banned phrases"
 
 echo "Checking for standalone '...' lines..."
-grep -E "^\.\.\.$" README.md && echo "ERROR: Standalone '...' found!" || echo "✓ No standalone '...' lines"
+grep -E "^\.\.\.$" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E" && echo "ERROR: Standalone '...' found!" || echo "✓ No standalone '...' lines"
 
 echo "Checking for truncated fragments..."
-grep -E "[a-z]\.\.\.[a-z]" README.md && echo "ERROR: Truncated fragments found!" || echo "✓ No truncated fragments"
+grep -E "[a-z]\.\.\.[a-z]" README.md | grep -v "## 14. Consistency Checks" | grep -v "grep -E" && echo "ERROR: Truncated fragments found!" || echo "✓ No truncated fragments"
 ```
 
 **ASSUMPTION:** All consistency checks pass before the README is considered ready for use.
