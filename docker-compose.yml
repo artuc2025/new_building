@@ -5,9 +5,6 @@ services:
   postgres:
     image: postgis/postgis:15-3.3
     container_name: postgres-dev
-    env_file:
-      - .env
-      - .env.local
     environment:
       POSTGRES_DB: ${LISTINGS_DB_NAME:-new_building_portal}
       POSTGRES_USER: ${LISTINGS_DB_USER:-postgres}
@@ -26,9 +23,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis-dev
-    env_file:
-      - .env
-      - .env.local
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -58,9 +54,6 @@ services:
   nats:
     image: nats:2.10-alpine
     container_name: nats-dev
-    env_file:
-      - .env
-      - .env.local
     ports:
       - "4222:4222"  # Client connections
       - "8222:8222"  # HTTP monitoring
@@ -83,9 +76,6 @@ services:
   meilisearch:
     image: getmeili/meilisearch:v1.5
     container_name: meilisearch-dev
-    env_file:
-      - .env
-      - .env.local
     ports:
       - "7700:7700"
     environment:
@@ -106,9 +96,6 @@ services:
     ports:
       - "9000:9000"  # API
       - "9001:9001"  # Console
-    env_file:
-      - .env
-      - .env.local
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -120,9 +107,11 @@ services:
   minio-setup:
     image: minio/mc:latest
     container_name: minio-setup
-    env_file:
-      - .env
-      - .env.local
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET_BUILDINGS: ${MINIO_BUCKET_BUILDINGS:-buildings-media}
+      MINIO_BUCKET_BLOG: ${MINIO_BUCKET_BLOG:-blog-media}
     depends_on:
       minio:
         condition: service_started
