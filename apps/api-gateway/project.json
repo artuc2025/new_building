@@ -1,0 +1,25 @@
+{
+  "name": "api-gateway",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/api-gateway/src",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter @new-building-portal/api-gateway serve",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter @new-building-portal/api-gateway build",
+        "cwd": "{projectRoot}"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    }
+  },
+  "tags": []
+}
+

@@ -1,0 +1,3 @@
+// OpenTelemetry setup
+export {};
+

@@ -1,0 +1,25 @@
+{
+  "name": "frontend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/frontend",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter @new-building-portal/frontend dev",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter @new-building-portal/frontend build",
+        "cwd": "{projectRoot}"
+      },
+      "outputs": ["{projectRoot}/.output"]
+    }
+  },
+  "tags": []
+}
+

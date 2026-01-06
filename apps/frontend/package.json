@@ -1,0 +1,22 @@
+{
+  "name": "@new-building-portal/frontend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 3001",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/devtools": "latest",
+    "nuxt": "^3.10.0"
+  },
+  "devDependencies": {
+    "@nuxt/typescript-build": "^3.0.2",
+    "typescript": "~5.3.0"
+  }
+}
+
