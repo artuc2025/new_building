@@ -9384,7 +9384,7 @@ The script also verifies that the README consistently mentions:
 The script verifies that no standalone lines containing only "..." exist in the README.
 
 **Check for truncated fragments:**
-The script verifies that no truncated fragments like "REA...echo" or "enfo...ach" exist in the README.
+The script verifies that no truncated fragments (for example, a word split by an omitted marker) exist in the README.
 
 **Note:** Object placeholders like `{...}` and array placeholders like `[...]` in JSON examples are acceptable as they represent structure placeholders, not literal string values.
 
