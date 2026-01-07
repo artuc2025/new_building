@@ -13,7 +13,7 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
     // Create partitioned events table (parent)
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS analytics.events (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID DEFAULT gen_random_uuid(),
         event_type VARCHAR(50) NOT NULL,
         entity_type VARCHAR(50),
         entity_id UUID,
@@ -21,7 +21,8 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
         metadata JSONB,
         ip_address INET,
         user_agent TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (created_at, id)
       ) PARTITION BY RANGE (created_at);
     `);
 

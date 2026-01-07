@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, PrimaryColumn, Index } from 'typeorm';
 
 @Entity('events', { schema: 'analytics' })
 @Index(['event_type', 'entity_type', 'entity_id'])
@@ -29,7 +29,7 @@ export class Event {
   @Column({ type: 'text', nullable: true })
   user_agent?: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @PrimaryColumn({ type: 'timestamptz', default: () => 'NOW()' })
   created_at: Date;
 }
 

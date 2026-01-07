@@ -18,8 +18,8 @@ export class Region {
   @Column({ type: 'varchar', length: 50, nullable: false })
   region_type: 'city' | 'district' | 'neighborhood';
 
-  @Column({ type: 'geometry', spatialFeatureType: 'Polygon', srid: 4326, nullable: true })
-  boundary?: string; // PostGIS POLYGON stored as WKT
+  @Column({ type: 'geography', spatialFeatureType: 'Polygon', srid: 4326, nullable: true })
+  boundary?: string; // PostGIS GEOGRAPHY(POLYGON, 4326) stored as WKT
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

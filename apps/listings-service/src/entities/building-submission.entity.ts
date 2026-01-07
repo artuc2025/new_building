@@ -19,8 +19,8 @@ export class BuildingSubmission {
   @Column({ type: 'jsonb', nullable: true })
   address?: Record<string, string>;
 
-  @Column({ type: 'geometry', spatialFeatureType: 'Point', srid: 4326, nullable: true })
-  location?: string; // PostGIS POINT stored as WKT
+  @Column({ type: 'geography', spatialFeatureType: 'Point', srid: 4326, nullable: true })
+  location?: string; // PostGIS GEOGRAPHY(POINT, 4326) stored as WKT
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   developer_name?: string;

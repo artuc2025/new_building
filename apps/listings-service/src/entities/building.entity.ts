@@ -24,8 +24,8 @@ export class Building {
   @Column({ type: 'jsonb', nullable: false })
   address: Record<string, string>;
 
-  @Column({ type: 'geometry', spatialFeatureType: 'Point', srid: 4326, nullable: false })
-  location: string; // PostGIS POINT stored as WKT (e.g., 'POINT(44.5091 40.1811)')
+  @Column({ type: 'geography', spatialFeatureType: 'Point', srid: 4326, nullable: false })
+  location: string; // PostGIS GEOGRAPHY(POINT, 4326) stored as WKT (e.g., 'POINT(44.5091 40.1811)')
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   address_line_1?: string;
