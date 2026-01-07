@@ -1,10 +1,5 @@
 import { createPool, getDbUrl } from '../db/data-source';
-
-// Create pools for each service
-const listingsPool = createPool('listings');
-const contentPool = createPool('content');
-const mediaPool = createPool('media');
-const analyticsPool = createPool('analytics');
+import { Pool } from 'pg';
 
 // Helper to generate JSONB for multi-language fields
 const ml = (am: string, ru: string, en: string) => ({ am, ru, en });
@@ -16,49 +11,130 @@ const point = (lng: number, lat: number) => `POINT(${lng} ${lat})`;
 const polygon = (minLng: number, minLat: number, maxLng: number, maxLat: number) =>
   `POLYGON((${minLng} ${minLat}, ${maxLng} ${minLat}, ${maxLng} ${maxLat}, ${minLng} ${maxLat}, ${minLng} ${minLat}))`;
 
+type DbMode = 'SHARED' | 'PER_SERVICE' | 'MIXED';
+
+const REQUIRED_PER_SERVICE_KEYS = [
+  'DATABASE_URL_LISTINGS',
+  'DATABASE_URL_CONTENT',
+  'DATABASE_URL_MEDIA',
+  'DATABASE_URL_ANALYTICS',
+] as const;
+
 /**
- * Detect DB configuration mode and print safely (no credentials/URLs)
+ * Detect DB configuration mode with strict validation.
+ * Returns the mode and environment status.
  */
-function printDbMode() {
-  const serviceEnvVars = {
-    listings: 'DATABASE_URL_LISTINGS',
-    content: 'DATABASE_URL_CONTENT',
-    media: 'DATABASE_URL_MEDIA',
-    analytics: 'DATABASE_URL_ANALYTICS',
+function detectDbMode(): { mode: DbMode; envStatus: Record<string, boolean> } {
+  const envStatus: Record<string, boolean> = {
+    DATABASE_URL: !!process.env.DATABASE_URL,
   };
 
-  // Check if any per-service URL is set
-  const hasPerServiceUrls = Object.values(serviceEnvVars).some(
-    (envVar) => !!process.env[envVar]
-  );
-
-  if (hasPerServiceUrls) {
-    console.log('[seed] DB mode: per-service URLs');
-    for (const [service, envVar] of Object.entries(serviceEnvVars)) {
-      const isSet = !!process.env[envVar];
-      const fallbackSet = !!process.env.DATABASE_URL;
-      console.log(
-        `[seed] ${service}: ${envVar} ${isSet ? '(set)' : '(not set)'} | fallback: DATABASE_URL ${fallbackSet ? '(set)' : '(not set)'}`
-      );
+  let perServiceCount = 0;
+  for (const key of REQUIRED_PER_SERVICE_KEYS) {
+    const isSet = !!process.env[key];
+    envStatus[key] = isSet;
+    if (isSet) {
+      perServiceCount++;
     }
-  } else {
-    console.log('[seed] DB mode: shared DATABASE_URL');
-    const isSet = !!process.env.DATABASE_URL;
-    console.log(`[seed] all services use DATABASE_URL ${isSet ? '(set)' : '(not set)'}`);
   }
+
+  const hasShared = envStatus.DATABASE_URL;
+  const hasAllPerService = perServiceCount === REQUIRED_PER_SERVICE_KEYS.length;
+  const hasNoPerService = perServiceCount === 0;
+
+  // Rule 1: SHARED mode - DATABASE_URL set AND none of per-service keys are set
+  if (hasShared && hasNoPerService) {
+    return { mode: 'SHARED', envStatus };
+  }
+
+  // Rule 2: PER_SERVICE mode - all 4 per-service keys are set (regardless of DATABASE_URL)
+  if (hasAllPerService) {
+    return { mode: 'PER_SERVICE', envStatus };
+  }
+
+  // Rule 3: MIXED/INVALID - anything else
+  return { mode: 'MIXED', envStatus };
+}
+
+/**
+ * Print DB mode and environment status safely (no credentials/URLs).
+ * Each log line is on its own line.
+ */
+function printDbMode(mode: DbMode, envStatus: Record<string, boolean>) {
+  if (mode === 'SHARED') {
+    console.log('[seed] DB mode: SHARED');
+    console.log(`[seed] DATABASE_URL: ${envStatus.DATABASE_URL ? '(set)' : '(not set)'}`);
+    console.log('');
+    return;
+  }
+
+  if (mode === 'PER_SERVICE') {
+    console.log('[seed] DB mode: PER_SERVICE');
+    for (const key of REQUIRED_PER_SERVICE_KEYS) {
+      console.log(`[seed] ${key}: ${envStatus[key] ? '(set)' : '(not set)'}`);
+    }
+    console.log('');
+    return;
+  }
+
+  // MIXED mode - should not reach here if validation works correctly
+  console.log('[seed] DB mode: MIXED');
   console.log('');
+}
+
+/**
+ * Validate DB configuration and fail-fast on invalid/mixed mode.
+ * Returns the validated mode.
+ */
+function validateDbMode(): DbMode {
+  const { mode, envStatus } = detectDbMode();
+
+  if (mode === 'MIXED') {
+    const allowMixed = process.env.SEED_ALLOW_MIXED === '1';
+    
+    if (allowMixed) {
+      console.log('[seed] WARNING: SEED_ALLOW_MIXED=1 enabled — mixed DB config may cause partial seeding');
+      console.log('');
+      return mode;
+    }
+
+    // Fail-fast with clear actionable message
+    console.log('[seed] DB mode: INVALID (mixed configuration)');
+    console.log('[seed] Set EITHER:');
+    console.log('[seed]   - DATABASE_URL (shared mode) and unset all DATABASE_URL_*,');
+    console.log('[seed]   OR');
+    console.log('[seed]   - set ALL of: DATABASE_URL_LISTINGS, DATABASE_URL_CONTENT, DATABASE_URL_MEDIA, DATABASE_URL_ANALYTICS (per-service mode)');
+    console.log('[seed] Current env status:');
+    console.log(`[seed]   - DATABASE_URL: ${envStatus.DATABASE_URL ? '(set)' : '(not set)'}`);
+    for (const key of REQUIRED_PER_SERVICE_KEYS) {
+      console.log(`[seed]   - ${key}: ${envStatus[key] ? '(set)' : '(not set)'}`);
+    }
+    console.log('');
+    process.exit(1);
+  }
+
+  printDbMode(mode, envStatus);
+  return mode;
 }
 
 async function seed() {
   console.log('🌱 Starting database seed...');
-  printDbMode();
+  
+  // Validate DB configuration and fail-fast on invalid/mixed mode
+  validateDbMode();
+
+  // Create pools for each service after validation passes
+  const listingsPool = createPool('listings');
+  const contentPool = createPool('content');
+  const mediaPool = createPool('media');
+  const analyticsPool = createPool('analytics');
 
   // Seed each service in its own transaction
   // Note: We seed media first because listings references media IDs
-  const mediaAssetIds = await seedMedia();
-  const buildingIds = await seedListings(mediaAssetIds);
-  await seedContent();
-  await seedAnalytics(buildingIds);
+  const mediaAssetIds = await seedMedia(mediaPool);
+  const buildingIds = await seedListings(listingsPool, mediaAssetIds);
+  await seedContent(contentPool);
+  await seedAnalytics(analyticsPool, buildingIds);
 
   console.log('\n✅ All seed operations completed successfully!');
   
@@ -69,7 +145,7 @@ async function seed() {
   await analyticsPool.end();
 }
 
-async function seedMedia(): Promise<string[]> {
+async function seedMedia(mediaPool: Pool): Promise<string[]> {
   const client = await mediaPool.connect();
 
   try {
@@ -112,7 +188,7 @@ async function seedMedia(): Promise<string[]> {
   }
 }
 
-async function seedListings(mediaAssetIds: string[]): Promise<string[]> {
+async function seedListings(listingsPool: Pool, mediaAssetIds: string[]): Promise<string[]> {
   const client = await listingsPool.connect();
 
   try {
@@ -331,7 +407,7 @@ async function seedListings(mediaAssetIds: string[]): Promise<string[]> {
   }
 }
 
-async function seedContent(): Promise<void> {
+async function seedContent(contentPool: Pool): Promise<void> {
   const client = await contentPool.connect();
 
   try {
@@ -383,7 +459,7 @@ async function seedContent(): Promise<void> {
   }
 }
 
-async function seedAnalytics(buildingIds: string[]): Promise<void> {
+async function seedAnalytics(analyticsPool: Pool, buildingIds: string[]): Promise<void> {
   const client = await analyticsPool.connect();
 
   try {
