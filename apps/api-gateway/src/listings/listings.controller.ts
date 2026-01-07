@@ -13,6 +13,7 @@ import {
   HttpStatus,
   HttpException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiExcludeController } from '@nestjs/swagger';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -20,6 +21,7 @@ import { firstValueFrom, timeout, catchError } from 'rxjs';
 import { AxiosError } from 'axios';
 import { AdminGuard } from '../common/guards/admin.guard';
 
+@ApiExcludeController()
 @Controller('api/v1/buildings')
 export class ListingsController {
   constructor(
@@ -218,20 +220,31 @@ export class ListingsController {
   }
 
   @Get()
-  async findAll(@Req() req: Request, @Query() query: any): Promise<any> {
-    const queryString = new URLSearchParams(query).toString();
+  @ApiOperation({ summary: 'Get paginated list of buildings (public)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
+  @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency filter' })
+  async findAll(@Req() req: Request): Promise<any> {
+    const query = req.query;
+    const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/buildings${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request, @Query() query: any): Promise<any> {
-    const queryString = new URLSearchParams(query).toString();
+  @ApiOperation({ summary: 'Get building by ID (public)' })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
+  @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency for price conversion' })
+  async findOne(@Param('id') id: string, @Req() req: Request): Promise<any> {
+    const query = req.query;
+    const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/buildings/${id}${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
   }
 }
 
+@ApiExcludeController()
 @Controller('api/v1/admin/buildings')
 @UseGuards(AdminGuard)
 export class AdminListingsController {
@@ -391,30 +404,56 @@ export class AdminListingsController {
   }
 
   @Get()
-  async findAll(@Req() req: Request, @Query() query: any): Promise<any> {
-    const queryString = new URLSearchParams(query).toString();
+  @ApiOperation({ summary: 'Get paginated list of buildings (admin)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
+  async findAll(@Req() req: Request): Promise<any> {
+    const query = req.query;
+    const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/admin/buildings${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get building by ID (admin)' })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
   async findOne(@Param('id') id: string, @Req() req: Request): Promise<any> {
     return this.proxyRequest('GET', `/v1/admin/buildings/${id}`, req);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() body: any, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('POST', '/v1/admin/buildings', req, body);
+  @ApiOperation({ summary: 'Create a new building (admin)' })
+  @ApiBody({ 
+    description: 'Building data',
+    schema: {
+      type: 'object',
+      additionalProperties: true,
+    },
+  })
+  async create(@Req() req: Request): Promise<any> {
+    return this.proxyRequest('POST', '/v1/admin/buildings', req, req.body);
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: any, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('PUT', `/v1/admin/buildings/${id}`, req, body);
+  @ApiOperation({ summary: 'Update building by ID (admin)' })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
+  @ApiBody({ 
+    description: 'Updated building data',
+    schema: {
+      type: 'object',
+      additionalProperties: true,
+    },
+  })
+  async update(@Param('id') id: string, @Req() req: Request): Promise<any> {
+    return this.proxyRequest('PUT', `/v1/admin/buildings/${id}`, req, req.body);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete building by ID (admin)' })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
   async remove(@Param('id') id: string, @Req() req: Request): Promise<any> {
     return this.proxyRequest('DELETE', `/v1/admin/buildings/${id}`, req);
   }

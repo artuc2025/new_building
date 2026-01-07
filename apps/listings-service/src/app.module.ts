@@ -5,6 +5,9 @@ import { BuildingsModule } from './buildings/buildings.module';
 import { AppDataSource } from './data-source';
 import { SwaggerModule } from './swagger/swagger.module';
 
+// During OpenAPI generation, prevent TypeORM from actually connecting
+const skipDatabaseConnection = process.env.SKIP_DB_CONNECTION === 'true' || process.env.GENERATE_OPENAPI === 'true';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -12,17 +15,32 @@ import { SwaggerModule } from './swagger/swagger.module';
       envFilePath: ['.env.local', '.env'],
     }),
     TypeOrmModule.forRootAsync({
-      useFactory: () => ({
-        type: 'postgres',
-        url: process.env.DATABASE_URL || process.env.DATABASE_URL_LISTINGS || 'postgresql://postgres:postgres@localhost:5432/new_building_portal',
-        schema: 'listings',
-        synchronize: false,
-        logging: process.env.NODE_ENV === 'development',
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        migrations: [__dirname + '/migrations/*{.ts,.js}'],
-        migrationsTableName: 'typeorm_migrations',
-        migrationsRun: false,
-      }),
+      useFactory: () => {
+        const config: any = {
+          type: 'postgres',
+          url: process.env.DATABASE_URL || process.env.DATABASE_URL_LISTINGS || 'postgresql://postgres:postgres@localhost:5432/new_building_portal',
+          schema: 'listings',
+          synchronize: false,
+          logging: process.env.NODE_ENV === 'development',
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          migrations: [__dirname + '/migrations/*{.ts,.js}'],
+          migrationsTableName: 'typeorm_migrations',
+          migrationsRun: false,
+        };
+        
+        // During OpenAPI generation, prevent connection attempts
+        if (skipDatabaseConnection) {
+          config.retryAttempts = 0;
+          config.retryDelay = 0;
+          // Use a connection that will fail immediately without retrying
+          config.extra = {
+            connectionTimeoutMillis: 1,
+            query_timeout: 1,
+          };
+        }
+        
+        return config;
+      },
     }),
     BuildingsModule,
     SwaggerModule,

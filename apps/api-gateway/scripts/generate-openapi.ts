@@ -67,7 +67,12 @@ async function generateOpenAPI() {
         'admin-key',
       )
       .build();
-    const document = SwaggerModule.createDocument(app, config);
+    
+    // Create document with options to handle parameter metadata issues
+    const document = SwaggerModule.createDocument(app, config, {
+      ignoreGlobalPrefix: false,
+      deepScanRoutes: true,
+    });
     
     // Write to openapi.json in service root
     const outputPath = join(__dirname, '..', 'openapi.json');
