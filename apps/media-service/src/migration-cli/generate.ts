@@ -1,5 +1,10 @@
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync, execSync, type ExecSyncOptions } from 'child_process';
+import { createRequire } from 'module';
 import { resolve } from 'path';
+
+// ESM-safe require resolution
+// @ts-ignore - import.meta.url is valid in tsx runtime even with CommonJS tsconfig
+const moduleRequire = createRequire(import.meta.url);
 
 // Parse --name argument (supports both --name=Value and --name Value formats)
 let migrationName: string | undefined;
@@ -30,13 +35,13 @@ try {
   const dataSourcePath = 'src/data-source.ts'; // Relative to serviceRoot
   const migrationPath = `src/migrations/${migrationName}`; // Relative to serviceRoot, TypeORM will add timestamp
 
-  // Resolve TypeORM CLI path (works with pnpm hoisting)
+  // Resolve TypeORM CLI path (ESM-safe resolution)
   let typeormCliPath: string;
   try {
-    typeormCliPath = require.resolve('typeorm/cli');
-  } catch {
-    // Fallback to relative path if require.resolve fails
-    typeormCliPath = resolve(serviceRoot, 'node_modules/typeorm/cli.js');
+    typeormCliPath = moduleRequire.resolve('typeorm/cli');
+  } catch (error) {
+    console.error("Error: cannot resolve 'typeorm/cli'. Ensure 'typeorm' is installed and accessible in this workspace.");
+    process.exit(1);
   }
 
   console.log(`Generating migration: ${migrationName}...`);
@@ -57,7 +62,7 @@ try {
       stdio: 'inherit',
       env: { ...process.env },
       shell: true,
-    });
+    } as unknown as ExecSyncOptions);
   } else {
     // On Unix, use execFileSync to avoid shell quoting issues
     execFileSync(pnpmCmd, args, {
