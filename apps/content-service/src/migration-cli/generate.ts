@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { resolve } from 'path';
 
 // Parse --name argument (supports both --name=Value and --name Value formats)
@@ -27,23 +27,33 @@ if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(migrationName)) {
 
 try {
   const serviceRoot = resolve(__dirname, '../..');
-  const dataSourcePath = resolve(serviceRoot, 'src/data-source.ts');
-  const migrationsPath = resolve(serviceRoot, 'src/migrations');
+  const dataSourcePath = 'src/data-source.ts'; // Relative to serviceRoot
+  const migrationPath = `src/migrations/${migrationName}`; // Relative to serviceRoot, TypeORM will add timestamp
+
+  // Resolve TypeORM CLI path (works with pnpm hoisting)
+  let typeormCliPath: string;
+  try {
+    typeormCliPath = require.resolve('typeorm/cli');
+  } catch {
+    // Fallback to relative path if require.resolve fails
+    typeormCliPath = resolve(serviceRoot, 'node_modules/typeorm/cli.js');
+  }
 
   console.log(`Generating migration: ${migrationName}...`);
-  console.log(`  DataSource: ${dataSourcePath}`);
-  console.log(`  Migrations folder: ${migrationsPath}`);
+  console.log(`  DataSource: ${resolve(serviceRoot, dataSourcePath)}`);
+  console.log(`  Migrations folder: ${resolve(serviceRoot, 'src/migrations')}`);
 
-  // Use TypeORM CLI to generate migration
+  // Use TypeORM CLI via tsx to handle TypeScript DataSource import
   // TypeORM will automatically add timestamp prefix to the migration file
-  const migrationPath = `${migrationsPath}/${migrationName}`;
-  const command = `pnpm exec typeorm migration:generate -d ${dataSourcePath} ${migrationPath}`;
-  
-  execSync(command, {
-    cwd: serviceRoot,
-    stdio: 'inherit',
-    env: { ...process.env },
-  });
+  execFileSync(
+    'pnpm',
+    ['exec', 'tsx', typeormCliPath, 'migration:generate', '-d', dataSourcePath, migrationPath],
+    {
+      cwd: serviceRoot,
+      stdio: 'inherit',
+      env: { ...process.env },
+    }
+  );
 
   console.log(`✅ Migration generated successfully`);
 } catch (error) {
