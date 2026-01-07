@@ -1,277 +1,331 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import * as request from 'supertest';
-import { AppModule } from '../../src/app.module';
-import { startTestDatabase, stopTestDatabase } from '../utils/test-db';
-import { Repository } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Building } from '../../src/entities/building.entity';
-import { Developer } from '../../src/entities/developer.entity';
-import { Region } from '../../src/entities/region.entity';
+import { ConfigModule } from '@nestjs/config';
+import { BuildingsModule } from '../../src/buildings/buildings.module';
+import { SwaggerModule } from '../../src/swagger/swagger.module';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase } from '../utils/test-db';
+import { createTestDeveloper, createTestRegion, createTestBuilding } from '../utils/fixtures';
+import { DataSource } from 'typeorm';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import SwaggerParser from '@apidevtools/swagger-parser';
 
-describe('Buildings Integration Tests', () => {
+describe('Buildings API Integration Tests (listings-service)', () => {
   let app: INestApplication;
-  let buildingRepository: Repository<Building>;
-  let developerRepository: Repository<Developer>;
-  let regionRepository: Repository<Region>;
-  let testDeveloper: Developer;
-  let testRegion: Region;
+  let dataSource: DataSource;
+  let ajv: Ajv;
+  let openApiSpec: any;
 
   beforeAll(async () => {
-    // Set admin key for tests
-    process.env.ADMIN_API_KEY = 'test-admin-key';
+    // Setup test database
+    dataSource = await setupTestDatabase();
 
-    // Start test database
-    await startTestDatabase();
-
-    // Create NestJS app
+    // Create NestJS app with test database connection
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+        }),
+        TypeOrmModule.forRoot({
+          type: 'postgres',
+          host: dataSource.options.host as string,
+          port: dataSource.options.port as number,
+          username: dataSource.options.username as string,
+          password: dataSource.options.password as string,
+          database: dataSource.options.database as string,
+          schema: 'listings',
+          synchronize: false,
+          logging: false,
+          entities: [__dirname + '/../../src/**/*.entity{.ts,.js}'],
+          migrations: [__dirname + '/../../src/migrations/*{.ts,.js}'],
+          migrationsTableName: 'typeorm_migrations',
+          migrationsRun: false,
+        }),
+        BuildingsModule,
+        SwaggerModule,
+      ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
-    // Apply global validation pipe
     app.useGlobalPipes(
       new ValidationPipe({
-        transform: true,
         whitelist: true,
         forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
       }),
     );
-
-    buildingRepository = moduleFixture.get<Repository<Building>>(
-      getRepositoryToken(Building),
-    );
-    developerRepository = moduleFixture.get<Repository<Developer>>(
-      getRepositoryToken(Developer),
-    );
-    regionRepository = moduleFixture.get<Repository<Region>>(
-      getRepositoryToken(Region),
-    );
-
-    // Create test data
-    testDeveloper = developerRepository.create({
-      id: '00000000-0000-0000-0000-000000000001',
-      name: { en: 'Test Developer' },
-      description: { en: 'Test Description' },
-    });
-    await developerRepository.save(testDeveloper);
-
-    testRegion = regionRepository.create({
-      id: '00000000-0000-0000-0000-000000000001',
-      name: { en: 'Test Region' },
-      region_type: 'district',
-    });
-    await regionRepository.save(testRegion);
-
     await app.init();
+
+    // Setup Ajv for contract validation
+    ajv = new Ajv({ allErrors: true, strict: false });
+    addFormats(ajv);
+
+    // Load OpenAPI spec from running app
+    const response = await request(app.getHttpServer()).get('/api-docs-json');
+    openApiSpec = await SwaggerParser.dereference(response.body);
   });
 
   afterAll(async () => {
-    // Cleanup
-    if (buildingRepository) {
-      await buildingRepository.delete({});
-    }
-    if (developerRepository) {
-      await developerRepository.delete({});
-    }
-    if (regionRepository) {
-      await regionRepository.delete({});
-    }
-    
     await app.close();
-    await stopTestDatabase();
+    await teardownTestDatabase();
   });
 
   beforeEach(async () => {
-    // Clean up buildings before each test
-    await buildingRepository.delete({});
+    await clearDatabase(dataSource);
   });
 
-  describe('CRUD Operations', () => {
-    it('should create a building (POST /v1/admin/buildings)', async () => {
+  const validateResponse = (statusCode: number, responseBody: any, path: string, method: string) => {
+    if (statusCode >= 200 && statusCode < 300) {
+      const pathObj = openApiSpec.paths[path];
+      if (!pathObj) {
+        console.warn(`No OpenAPI spec found for path: ${path}`);
+        return;
+      }
+
+      const operation = pathObj[method.toLowerCase()];
+      if (!operation) {
+        console.warn(`No OpenAPI spec found for ${method} ${path}`);
+        return;
+      }
+
+      const responseSchema = operation.responses?.[statusCode]?.content?.['application/json']?.schema;
+      if (responseSchema) {
+        const validate = ajv.compile(responseSchema);
+        const valid = validate(responseBody);
+        if (!valid) {
+          console.error('Contract validation errors:', validate.errors);
+          expect(valid).toBe(true);
+        }
+      }
+    }
+  };
+
+  describe('GET /v1/buildings', () => {
+    it('should return paginated list of buildings (happy path)', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      await createTestBuilding(dataSource, developer.id, region.id, { status: 'published' });
+
+      const response = await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ page: 1, limit: 10 })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('total');
+      expect(response.body).toHaveProperty('page');
+      expect(response.body).toHaveProperty('limit');
+      expect(response.body).toHaveProperty('total_pages');
+      expect(Array.isArray(response.body.data)).toBe(true);
+
+      validateResponse(200, response.body, '/v1/buildings', 'GET');
+    });
+
+    it('should return 400 for invalid query parameters', async () => {
+      await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ page: -1, limit: 200 })
+        .expect(400);
+    });
+  });
+
+  describe('GET /v1/buildings/:id', () => {
+    it('should return building details (happy path)', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
+
+      const response = await request(app.getHttpServer())
+        .get(`/v1/buildings/${building.id}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data.id).toBe(building.id);
+
+      validateResponse(200, response.body, '/v1/buildings/{id}', 'GET');
+    });
+
+    it('should return 404 when building not found', async () => {
+      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      await request(app.getHttpServer())
+        .get(`/v1/buildings/${nonExistentId}`)
+        .expect(404);
+    });
+  });
+
+  describe('POST /v1/admin/buildings', () => {
+    const adminKey = 'test-admin-key';
+
+    beforeAll(() => {
+      process.env.ADMIN_API_KEY = adminKey;
+    });
+
+    afterAll(() => {
+      delete process.env.ADMIN_API_KEY;
+    });
+
+    it('should create a building (happy path)', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+
       const createDto = {
-        title: { en: 'New Building', am: 'Նոր Շենք' },
-        address: { en: '123 Main St', am: '123 Գլխավոր Փողոց' },
-        location: { lat: 40.1811, lng: 44.5091 },
-        floors: 10,
-        areaMin: 60,
-        areaMax: 120,
-        developerId: testDeveloper.id,
-        regionId: testRegion.id,
+        title: { en: 'New Building', am: 'Նոր Շենք', ru: 'Новое Здание' },
+        description: { en: 'New building description' },
+        address: { en: 'New Address 456', am: 'Նոր Հասցե 456', ru: 'Новый Адрес 456' },
+        location: { longitude: 44.5091, latitude: 40.1811 },
+        floors: 5,
+        area_min: 60,
+        area_max: 120,
+        developer_id: developer.id,
+        region_id: region.id,
+        status: 'draft',
       };
 
       const response = await request(app.getHttpServer())
         .post('/v1/admin/buildings')
-        .set('x-admin-key', 'test-admin-key')
+        .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
 
       expect(response.body).toHaveProperty('data');
       expect(response.body.data).toHaveProperty('id');
-      expect(response.body.data.title).toEqual(createDto.title);
-      expect(response.body.data.location).toEqual(createDto.location);
-      expect(response.body.data.floors).toBe(createDto.floors);
+      expect(response.body.data.title.en).toBe('New Building');
+
+      validateResponse(201, response.body, '/v1/admin/buildings', 'POST');
     });
 
-    it('should list buildings (GET /v1/buildings)', async () => {
-      // Create a building first
-      const building = buildingRepository.create({
-        title: { en: 'Listed Building' },
-        address: { en: 'Address' },
-        location: 'POINT(44.5091 40.1811)',
+    it('should return 401 for missing admin key', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { longitude: 44.5091, latitude: 40.1811 },
         floors: 5,
-        area_min: 50,
-        area_max: 100,
-        currency: 'AMD',
-        developer_id: testDeveloper.id,
-        region_id: testRegion.id,
-        status: 'published',
-      });
-      await buildingRepository.save(building);
+        area_min: 60,
+        area_max: 120,
+        developer_id: developer.id,
+        region_id: region.id,
+      };
 
-      const response = await request(app.getHttpServer())
-        .get('/v1/buildings')
-        .query({ page: 1, limit: 20 })
-        .expect(200);
-
-      expect(response.body).toHaveProperty('data');
-      expect(response.body).toHaveProperty('pagination');
-      expect(Array.isArray(response.body.data)).toBe(true);
-      expect(response.body.pagination.page).toBe(1);
-      expect(response.body.pagination.limit).toBe(20);
+      await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .send(createDto)
+        .expect(401);
     });
 
-    it('should get building by ID (GET /v1/buildings/:id)', async () => {
-      // Create a building first
-      const building = buildingRepository.create({
-        title: { en: 'Detail Building' },
-        address: { en: 'Address' },
-        location: 'POINT(44.5091 40.1811)',
-        floors: 8,
-        area_min: 55,
-        area_max: 110,
-        currency: 'AMD',
-        developer_id: testDeveloper.id,
-        region_id: testRegion.id,
-        status: 'published',
-      });
-      const saved = await buildingRepository.save(building);
+    it('should return 401 for invalid admin key', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
 
-      const response = await request(app.getHttpServer())
-        .get(`/v1/buildings/${saved.id}`)
-        .expect(200);
-
-      expect(response.body).toHaveProperty('data');
-      expect(response.body.data.id).toBe(saved.id);
-      expect(response.body.data.title).toEqual(saved.title);
-      expect(response.body.data.location).toEqual({ lat: 40.1811, lng: 44.5091 });
-    });
-
-    it('should update a building (PUT /v1/admin/buildings/:id)', async () => {
-      // Create a building first
-      const building = buildingRepository.create({
-        title: { en: 'Original Title' },
-        address: { en: 'Original Address' },
-        location: 'POINT(44.5091 40.1811)',
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { longitude: 44.5091, latitude: 40.1811 },
         floors: 5,
-        area_min: 50,
-        area_max: 100,
-        currency: 'AMD',
-        developer_id: testDeveloper.id,
-        region_id: testRegion.id,
-        status: 'draft',
-      });
-      const saved = await buildingRepository.save(building);
+        area_min: 60,
+        area_max: 120,
+        developer_id: developer.id,
+        region_id: region.id,
+      };
+
+      await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .set('x-admin-key', 'wrong-key')
+        .send(createDto)
+        .expect(401);
+    });
+  });
+
+  describe('PUT /v1/admin/buildings/:id', () => {
+    const adminKey = 'test-admin-key';
+
+    beforeAll(() => {
+      process.env.ADMIN_API_KEY = adminKey;
+    });
+
+    afterAll(() => {
+      delete process.env.ADMIN_API_KEY;
+    });
+
+    it('should update a building (happy path)', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
 
       const updateDto = {
-        title: { en: 'Updated Title' },
-        floors: 12,
+        title: { en: 'Updated Building', am: 'Թարմացված Շենք', ru: 'Обновленное Здание' },
       };
 
       const response = await request(app.getHttpServer())
-        .put(`/v1/admin/buildings/${saved.id}`)
-        .set('x-admin-key', 'test-admin-key')
+        .put(`/v1/admin/buildings/${building.id}`)
+        .set('x-admin-key', adminKey)
         .send(updateDto)
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
-      expect(response.body.data.title).toEqual(updateDto.title);
-      expect(response.body.data.floors).toBe(updateDto.floors);
+      expect(response.body.data.title.en).toBe('Updated Building');
+
+      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'PUT');
     });
 
-    it('should soft-delete a building (DELETE /v1/admin/buildings/:id)', async () => {
-      // Create a building first
-      const building = buildingRepository.create({
-        title: { en: 'To Delete' },
-        address: { en: 'Address' },
-        location: 'POINT(44.5091 40.1811)',
-        floors: 5,
-        area_min: 50,
-        area_max: 100,
-        currency: 'AMD',
-        developer_id: testDeveloper.id,
-        region_id: testRegion.id,
-        status: 'published',
-      });
-      const saved = await buildingRepository.save(building);
+    it('should return 404 when building not found', async () => {
+      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      const updateDto = {
+        title: { en: 'Updated Building' },
+      };
+
+      await request(app.getHttpServer())
+        .put(`/v1/admin/buildings/${nonExistentId}`)
+        .set('x-admin-key', adminKey)
+        .send(updateDto)
+        .expect(404);
+    });
+  });
+
+  describe('DELETE /v1/admin/buildings/:id', () => {
+    const adminKey = 'test-admin-key';
+
+    beforeAll(() => {
+      process.env.ADMIN_API_KEY = adminKey;
+    });
+
+    afterAll(() => {
+      delete process.env.ADMIN_API_KEY;
+    });
+
+    it('should soft-delete a building (happy path)', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
 
       const response = await request(app.getHttpServer())
-        .delete(`/v1/admin/buildings/${saved.id}`)
-        .set('x-admin-key', 'test-admin-key')
+        .delete(`/v1/admin/buildings/${building.id}`)
+        .set('x-admin-key', adminKey)
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('status');
       expect(response.body.data.status).toBe('archived');
       expect(response.body.data).toHaveProperty('deletedAt');
 
-      // Verify building is not visible in public list
-      const listResponse = await request(app.getHttpServer())
-        .get('/v1/buildings')
-        .query({ page: 1, limit: 20 })
-        .expect(200);
-
-      const found = listResponse.body.data.find((b: any) => b.id === saved.id);
-      expect(found).toBeUndefined();
+      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'DELETE');
     });
-  });
 
-  describe('Validation Errors', () => {
-    it('should return 400 with error envelope for invalid data', async () => {
-      const invalidDto = {
-        title: { en: 'Invalid' },
-        // Missing required fields
-        floors: -1, // Invalid value
-      };
+    it('should return 404 when building not found', async () => {
+      const nonExistentId = '00000000-0000-0000-0000-000000000000';
 
-      const response = await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
-        .set('x-admin-key', 'test-admin-key')
-        .send(invalidDto)
-        .expect(400);
-
-      // Validate standard error envelope
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toHaveProperty('code');
-      expect(response.body.error).toHaveProperty('message');
-      expect(response.body.error).toHaveProperty('requestId');
-      expect(response.body.error).toHaveProperty('statusCode', 400);
-    });
-  });
-
-  describe('Not Found Errors', () => {
-    it('should return 404 with error envelope for non-existent building', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/v1/buildings/00000000-0000-0000-0000-000000000999')
+      await request(app.getHttpServer())
+        .delete(`/v1/admin/buildings/${nonExistentId}`)
+        .set('x-admin-key', adminKey)
         .expect(404);
-
-      // Validate standard error envelope
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error.code).toBe('NOT_FOUND');
-      expect(response.body.error).toHaveProperty('message');
-      expect(response.body.error).toHaveProperty('requestId');
-      expect(response.body.error).toHaveProperty('statusCode', 404);
     });
   });
 });

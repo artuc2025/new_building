@@ -1,59 +1,71 @@
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { execSync } from 'child_process';
-import { join } from 'path';
+import { DataSource } from 'typeorm';
 
 let container: StartedPostgreSqlContainer | null = null;
+let testDataSource: DataSource | null = null;
 
-export async function startTestDatabase(): Promise<StartedPostgreSqlContainer> {
-  if (container) {
-    return container;
+export async function setupTestDatabase(): Promise<DataSource> {
+  if (container && testDataSource) {
+    return testDataSource;
   }
 
-  // Start PostGIS container
-  container = await new PostgreSqlContainer('postgis/postgis:16-3.4')
-    .withDatabase('test_db')
-    .withUsername('test_user')
-    .withPassword('test_password')
-    .withReuse()
+  // Start PostgreSQL container
+  container = await new PostgreSqlContainer('postgis/postgis:15-3.3')
+    .withDatabase('test_listings')
+    .withUsername('test')
+    .withPassword('test')
     .start();
 
-  const connectionUrl = container.getConnectionUri();
+  // Create DataSource with test container connection
+  const projectRoot = __dirname + '/../../';
+  testDataSource = new DataSource({
+    type: 'postgres',
+    host: container.getHost(),
+    port: container.getPort(),
+    username: container.getUsername(),
+    password: container.getPassword(),
+    database: container.getDatabase(),
+    schema: 'listings',
+    synchronize: false,
+    logging: false,
+    entities: [projectRoot + 'src/entities/**/*.entity{.ts,.js}'],
+    migrations: [projectRoot + 'src/migrations/*{.ts,.js}'],
+    migrationsTableName: 'typeorm_migrations',
+    migrationsRun: false,
+  });
 
-  // Set environment variable for database URL
-  process.env.DATABASE_URL = connectionUrl;
-  process.env.DATABASE_URL_LISTINGS = connectionUrl;
+  await testDataSource.initialize();
 
-  // Run migrations using the migrate target
-  const projectRoot = join(__dirname, '../..');
+  // Create schema
+  const queryRunner = testDataSource.createQueryRunner();
   try {
-    execSync('pnpm nx run listings-service:migrate', {
-      cwd: projectRoot,
-      env: {
-        ...process.env,
-        DATABASE_URL: connectionUrl,
-        DATABASE_URL_LISTINGS: connectionUrl,
-      },
-      stdio: 'inherit',
-    });
-  } catch (error) {
-    console.error('Failed to run migrations:', error);
-    throw error;
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS listings;`);
+  } finally {
+    await queryRunner.release();
   }
 
-  return container;
+  // Run migrations
+  await testDataSource.runMigrations();
+
+  return testDataSource;
 }
 
-export async function stopTestDatabase(): Promise<void> {
+export async function teardownTestDatabase(): Promise<void> {
+  if (testDataSource) {
+    await testDataSource.destroy();
+    testDataSource = null;
+  }
   if (container) {
     await container.stop();
     container = null;
   }
 }
 
-export function getDatabaseUrl(): string {
-  if (!container) {
-    throw new Error('Database container not started. Call startTestDatabase() first.');
+export async function clearDatabase(dataSource: DataSource): Promise<void> {
+  const entities = dataSource.entityMetadatas;
+  for (const entity of entities) {
+    const repository = dataSource.getRepository(entity.name);
+    await repository.query(`TRUNCATE TABLE listings.${entity.tableName} CASCADE;`);
   }
-  return container.getConnectionUri();
 }
 

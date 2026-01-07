@@ -31,8 +31,7 @@
       "options": {
         "command": "tsx scripts/generate-openapi.ts",
         "cwd": "{projectRoot}"
-      },
-      "dependsOn": ["build"]
+      }
     },
     "openapi:validate": {
       "executor": "nx:run-commands",

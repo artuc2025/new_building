@@ -3,13 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "description": "Real Estate Portal: New Buildings in Armenia",
-  "scripts": {},
+  "scripts": {
+    "review:bundle": "tsx scripts/review-bundle.ts"
+  },
   "devDependencies": {
     "@nx/devkit": "19.0.0",
     "@nx/js": "19.0.0",
     "@nx/node": "19.0.0",
     "@nx/workspace": "19.0.0",
     "nx": "19.0.0",
+    "tsx": "^4.7.0",
     "typescript": "~5.3.0"
   },
   "engines": {

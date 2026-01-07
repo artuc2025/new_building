@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { SwaggerDocument } from './swagger/swagger.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -41,19 +42,16 @@ async function bootstrap() {
     .addTag('buildings')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  
-  // Swagger UI at /api-docs
   SwaggerModule.setup('api-docs', app, document);
-  
-  // JSON spec endpoint at /api-docs-json
-  app.getHttpAdapter().get('/api-docs-json', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.send(document);
-  });
+
+  // Store document in service for /api-docs-json endpoint
+  const swaggerDocumentService = app.get(SwaggerDocument);
+  swaggerDocumentService.setDocument(document);
 
   await app.listen(port);
   console.log(`Listings Service is running on: http://localhost:${port}`);
   console.log(`Swagger UI available at: http://localhost:${port}/api-docs`);
+  console.log(`Swagger JSON available at: http://localhost:${port}/api-docs-json`);
 }
 
 bootstrap();

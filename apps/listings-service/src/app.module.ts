@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BuildingsModule } from './buildings/buildings.module';
 import { AppDataSource } from './data-source';
+import { SwaggerModule } from './swagger/swagger.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AppDataSource } from './data-source';
       }),
     }),
     BuildingsModule,
+    SwaggerModule,
   ],
 })
 export class AppModule {}

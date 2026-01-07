@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { SwaggerDocument } from './swagger/swagger.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -48,24 +49,16 @@ async function bootstrap() {
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  
-  // Swagger UI at /api/docs (required by Sprint 2 DoD)
   SwaggerModule.setup('api/docs', app, document);
-  
-  // Compatibility: /api-docs redirects to /api/docs
-  app.getHttpAdapter().get('/api-docs', (req, res) => {
-    res.redirect('/api/docs');
-  });
-  
-  // JSON spec endpoint at /api-docs-json
-  app.getHttpAdapter().get('/api-docs-json', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.send(document);
-  });
+
+  // Store document in service for /api-docs-json endpoint
+  const swaggerDocumentService = app.get(SwaggerDocument);
+  swaggerDocumentService.setDocument(document);
 
   await app.listen(port);
   console.log(`API Gateway is running on: http://localhost:${port}`);
   console.log(`Swagger UI available at: http://localhost:${port}/api/docs`);
+  console.log(`Swagger JSON available at: http://localhost:${port}/api-docs-json`);
 }
 
 bootstrap();

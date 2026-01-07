@@ -5,6 +5,7 @@ import { HttpModule } from '@nestjs/axios';
 import { HealthController } from './health/health.controller';
 import { TcpHealthIndicator } from './health/tcp-health.indicator';
 import { ListingsModule } from './listings/listings.module';
+import { SwaggerModule } from './swagger/swagger.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ListingsModule } from './listings/listings.module';
     TerminusModule,
     HttpModule,
     ListingsModule,
+    SwaggerModule,
   ],
   controllers: [HealthController],
   providers: [TcpHealthIndicator],
