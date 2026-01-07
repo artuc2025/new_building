@@ -837,8 +837,10 @@ CREATE INDEX idx_seo_metadata_entity ON content.seo_metadata(entity_type, entity
 **`analytics.events`** (Partitioned by date for performance)
 ```sql
 -- Main table (parent)
+-- Note: PRIMARY KEY must include partition key (created_at) for partitioned tables
 CREATE TABLE analytics.events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
   event_type VARCHAR(50) NOT NULL,
   entity_type VARCHAR(50), -- 'building', 'article', 'developer'
   entity_id UUID,
@@ -846,7 +848,7 @@ CREATE TABLE analytics.events (
   metadata JSONB, -- Flexible event-specific data
   ip_address INET,
   user_agent TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  PRIMARY KEY (created_at, id)
 ) PARTITION BY RANGE (created_at);
 
 -- Partition for current month (example)
@@ -857,6 +859,7 @@ CREATE TABLE analytics.events_2024_01 PARTITION OF analytics.events
 CREATE INDEX idx_events_type_entity ON analytics.events_2024_01(event_type, entity_type, entity_id);
 CREATE INDEX idx_events_created_at ON analytics.events_2024_01(created_at DESC);
 CREATE INDEX idx_events_session ON analytics.events_2024_01(session_id) WHERE session_id IS NOT NULL;
+CREATE INDEX idx_events_id ON analytics.events_2024_01(id); -- Non-unique index for lookups by id
 ```
 
 **`analytics.aggregates`**

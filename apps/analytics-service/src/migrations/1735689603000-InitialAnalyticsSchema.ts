@@ -11,9 +11,11 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
 
     // Create partitioned events table (parent)
+    // Note: PRIMARY KEY must include partition key (created_at) for partitioned tables
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS analytics.events (
-        id UUID DEFAULT gen_random_uuid(),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        id UUID NOT NULL DEFAULT gen_random_uuid(),
         event_type VARCHAR(50) NOT NULL,
         entity_type VARCHAR(50),
         entity_id UUID,
@@ -21,7 +23,6 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
         metadata JSONB,
         ip_address INET,
         user_agent TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (created_at, id)
       ) PARTITION BY RANGE (created_at);
     `);
@@ -55,6 +56,12 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
       await queryRunner.query(`
         CREATE INDEX IF NOT EXISTS idx_events_session_${monthDate.getFullYear()}_${String(monthDate.getMonth() + 1).padStart(2, '0')}
         ON ${partitionName}(session_id) WHERE session_id IS NOT NULL;
+      `);
+
+      // Non-unique index on id for faster lookups by id
+      await queryRunner.query(`
+        CREATE INDEX IF NOT EXISTS idx_events_id_${monthDate.getFullYear()}_${String(monthDate.getMonth() + 1).padStart(2, '0')}
+        ON ${partitionName}(id);
       `);
     }
 
