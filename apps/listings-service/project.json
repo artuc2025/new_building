@@ -53,6 +53,21 @@
         "command": "pnpm --filter @new-building-portal/listings-service test",
         "cwd": "{projectRoot}"
       }
+    },
+    "openapi:generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx scripts/generate-openapi.ts",
+        "cwd": "{projectRoot}"
+      },
+      "dependsOn": ["build"]
+    },
+    "openapi:validate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx scripts/validate-openapi.ts",
+        "cwd": "{projectRoot}"
+      }
     }
   },
   "tags": []

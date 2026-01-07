@@ -41,7 +41,15 @@ async function bootstrap() {
     .addTag('buildings')
     .build();
   const document = SwaggerModule.createDocument(app, config);
+  
+  // Swagger UI at /api-docs
   SwaggerModule.setup('api-docs', app, document);
+  
+  // JSON spec endpoint at /api-docs-json
+  app.getHttpAdapter().get('/api-docs-json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(document);
+  });
 
   await app.listen(port);
   console.log(`Listings Service is running on: http://localhost:${port}`);

@@ -48,7 +48,20 @@ async function bootstrap() {
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);
+  
+  // Swagger UI at /api/docs (required by Sprint 2 DoD)
   SwaggerModule.setup('api/docs', app, document);
+  
+  // Compatibility: /api-docs redirects to /api/docs
+  app.getHttpAdapter().get('/api-docs', (req, res) => {
+    res.redirect('/api/docs');
+  });
+  
+  // JSON spec endpoint at /api-docs-json
+  app.getHttpAdapter().get('/api-docs-json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(document);
+  });
 
   await app.listen(port);
   console.log(`API Gateway is running on: http://localhost:${port}`);
