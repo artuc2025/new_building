@@ -109,5 +109,8 @@ export class Building {
 
   @Column({ type: 'tsvector', nullable: true, select: false })
   search_vector?: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  deleted_at?: Date;
 }
 
