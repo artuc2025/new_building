@@ -33,37 +33,52 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
     const currentDate = new Date();
     const monthsToCreate = 12;
     for (let i = 0; i < monthsToCreate; i++) {
-      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
-      const nextMonthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i + 1, 1);
-      const partitionName = `analytics.events_${monthDate.getFullYear()}_${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+      const year = currentDate.getUTCFullYear();
+      const month = currentDate.getUTCMonth() + i;
+      
+      // Use UTC dates to ensure partition boundaries are timezone-safe and deterministic
+      // Always start at 00:00:00.000Z on the 1st of the month
+      const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+      const end = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0));
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+      
+      const partitionName = `analytics.events_${year}_${String(month + 1).padStart(2, '0')}`;
       
       await queryRunner.query(`
         CREATE TABLE IF NOT EXISTS ${partitionName} PARTITION OF analytics.events
-        FOR VALUES FROM ('${monthDate.toISOString()}') TO ('${nextMonthDate.toISOString()}');
+        FOR VALUES FROM ('${startIso}') TO ('${endIso}');
       `);
 
       // Create indexes on partition
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_type_entity_${monthDate.getFullYear()}_${String(monthDate.getMonth() + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_type_entity_${year}_${String(month + 1).padStart(2, '0')}
         ON ${partitionName}(event_type, entity_type, entity_id);
       `);
 
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_created_at_${monthDate.getFullYear()}_${String(monthDate.getMonth() + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_created_at_${year}_${String(month + 1).padStart(2, '0')}
         ON ${partitionName}(created_at DESC);
       `);
 
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_session_${monthDate.getFullYear()}_${String(monthDate.getMonth() + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_session_${year}_${String(month + 1).padStart(2, '0')}
         ON ${partitionName}(session_id) WHERE session_id IS NOT NULL;
       `);
 
       // Non-unique index on id for faster lookups by id
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_id_${monthDate.getFullYear()}_${String(monthDate.getMonth() + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_id_${year}_${String(month + 1).padStart(2, '0')}
         ON ${partitionName}(id);
       `);
     }
+
+    // Create partitioned index on parent table (automatically applies to all partitions)
+    // This index supports typical queries filtering by event_type, entity_type, entity_id, and created_at
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_events_type_entity_created_at
+      ON analytics.events (event_type, entity_type, entity_id, created_at DESC);
+    `);
 
     // Create aggregates table
     await queryRunner.query(`
