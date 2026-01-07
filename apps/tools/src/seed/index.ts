@@ -43,6 +43,9 @@ async function seedMedia(): Promise<string[]> {
   const client = await mediaPool.connect();
 
   try {
+    // Ensure schema exists before starting transaction
+    await client.query('CREATE SCHEMA IF NOT EXISTS media;').catch(() => {});
+    
     await client.query('BEGIN');
     console.log('📦 Seeding media service...');
 
@@ -67,7 +70,11 @@ async function seedMedia(): Promise<string[]> {
     await client.query('COMMIT');
     return mediaAssets;
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // Ignore rollback errors (transaction may already be aborted)
+    }
     console.error('❌ Media seed failed:', error);
     throw error;
   } finally {
@@ -79,6 +86,9 @@ async function seedListings(mediaAssetIds: string[]): Promise<string[]> {
   const client = await listingsPool.connect();
 
   try {
+    // Ensure schema exists before starting transaction
+    await client.query('CREATE SCHEMA IF NOT EXISTS listings;').catch(() => {});
+    
     await client.query('BEGIN');
     console.log('📦 Seeding listings service...');
 
@@ -279,7 +289,11 @@ async function seedListings(mediaAssetIds: string[]): Promise<string[]> {
     await client.query('COMMIT');
     return buildings;
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // Ignore rollback errors (transaction may already be aborted)
+    }
     console.error('❌ Listings seed failed:', error);
     throw error;
   } finally {
@@ -291,6 +305,9 @@ async function seedContent(): Promise<void> {
   const client = await contentPool.connect();
 
   try {
+    // Ensure schema exists before starting transaction
+    await client.query('CREATE SCHEMA IF NOT EXISTS content;').catch(() => {});
+    
     await client.query('BEGIN');
     console.log('📦 Seeding content service...');
 
@@ -324,7 +341,11 @@ async function seedContent(): Promise<void> {
 
     await client.query('COMMIT');
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // Ignore rollback errors (transaction may already be aborted)
+    }
     console.error('❌ Content seed failed:', error);
     throw error;
   } finally {
@@ -336,6 +357,9 @@ async function seedAnalytics(buildingIds: string[]): Promise<void> {
   const client = await analyticsPool.connect();
 
   try {
+    // Ensure schema exists before starting transaction
+    await client.query('CREATE SCHEMA IF NOT EXISTS analytics;').catch(() => {});
+    
     await client.query('BEGIN');
     console.log('📦 Seeding analytics service...');
 
@@ -366,7 +390,11 @@ async function seedAnalytics(buildingIds: string[]): Promise<void> {
 
     await client.query('COMMIT');
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // Ignore rollback errors (transaction may already be aborted)
+    }
     console.error('❌ Analytics seed failed:', error);
     throw error;
   } finally {
