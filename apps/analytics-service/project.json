@@ -33,6 +33,13 @@
         "cwd": "{projectRoot}"
       }
     },
+    "migration:diagnose": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/migration-cli/diagnose.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
     "migrate": {
       "executor": "nx:run-commands",
       "options": {

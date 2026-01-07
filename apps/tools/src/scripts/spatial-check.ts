@@ -15,51 +15,86 @@ async function spatialCheck() {
     // Check 1: Distance query (find buildings within X meters of a point)
     console.log('1️⃣  Distance Query: Finding buildings within 2000m of Yerevan center (40.1811, 44.5091)');
     const distanceResult = await client.query(
-      `SELECT id, title, 
-              ST_Distance(location, ST_GeogFromText('POINT(44.5091 40.1811)')) as distance_meters
-       FROM listings.buildings
-       WHERE ST_DWithin(location, ST_GeogFromText('POINT(44.5091 40.1811)'), 2000)
-       ORDER BY distance_meters
-       LIMIT 5`
+      `SELECT b.id AS building_id, b.region_id,
+              ST_Distance(b.location, ST_GeogFromText('POINT(44.5091 40.1811)')) as distance_meters
+       FROM listings.buildings b
+       WHERE ST_DWithin(b.location, ST_GeogFromText('POINT(44.5091 40.1811)'), 2000)
+       ORDER BY b.id ASC
+       LIMIT 2`
     );
-    console.log(`   ✓ Found ${distanceResult.rows.length} buildings within 2000m`);
+    const distanceCount = await client.query(
+      `SELECT COUNT(*) as count
+       FROM listings.buildings
+       WHERE ST_DWithin(location, ST_GeogFromText('POINT(44.5091 40.1811)'), 2000)`
+    );
+    const distanceTotal = parseInt(distanceCount.rows[0].count, 10);
+    console.log(`   ✓ Found ${distanceTotal} buildings within 2000m`);
     if (distanceResult.rows.length > 0) {
-      console.log(`   Sample building IDs: ${distanceResult.rows.slice(0, 3).map((r: any) => r.id.substring(0, 8)).join(', ')}`);
+      const samples = distanceResult.rows.map((r: any) => ({
+        region_id: r.region_id,
+        building_id: r.building_id,
+      }));
+      console.log(`   [spatial] distance count=${distanceTotal} samples:`, JSON.stringify(samples));
     }
     console.log('');
 
     // Check 2: Bounding box query (buildings within map bounds)
     console.log('2️⃣  Bounding Box Query: Finding buildings within map bounds (44.4-44.6, 40.1-40.2)');
     const bboxResult = await client.query(
-      `SELECT id, title
+      `SELECT b.id AS building_id, b.region_id
+       FROM listings.buildings b
+       WHERE ST_Within(
+         b.location::geometry,
+         ST_MakeEnvelope(44.4, 40.1, 44.6, 40.2, 4326)
+       )
+       ORDER BY b.id ASC
+       LIMIT 2`
+    );
+    const bboxCount = await client.query(
+      `SELECT COUNT(*) as count
        FROM listings.buildings
        WHERE ST_Within(
          location::geometry,
          ST_MakeEnvelope(44.4, 40.1, 44.6, 40.2, 4326)
-       )
-       LIMIT 10`
+       )`
     );
-    console.log(`   ✓ Found ${bboxResult.rows.length} buildings in bounding box`);
+    const bboxTotal = parseInt(bboxCount.rows[0].count, 10);
+    console.log(`   ✓ Found ${bboxTotal} buildings in bounding box`);
     if (bboxResult.rows.length > 0) {
-      console.log(`   Sample building IDs: ${bboxResult.rows.slice(0, 3).map((r: any) => r.id.substring(0, 8)).join(', ')}`);
+      const samples = bboxResult.rows.map((r: any) => ({
+        region_id: r.region_id,
+        building_id: r.building_id,
+      }));
+      console.log(`   [spatial] bbox count=${bboxTotal} samples:`, JSON.stringify(samples));
     }
     console.log('');
 
     // Check 3: Point-in-polygon query (buildings whose point is inside a region boundary)
     console.log('3️⃣  Point-in-Polygon Query: Finding buildings inside region boundaries');
     const pipResult = await client.query(
-      `SELECT b.id, b.title, r.name as region_name
+      `SELECT b.id AS building_id, r.id AS region_id
        FROM listings.buildings b
        INNER JOIN listings.regions r ON b.region_id = r.id
        WHERE r.boundary IS NOT NULL
          AND ST_Within(b.location::geometry, r.boundary::geometry)
-       LIMIT 10`
+       ORDER BY b.id ASC
+       LIMIT 2`
     );
-    console.log(`   ✓ Found ${pipResult.rows.length} buildings inside region boundaries`);
+    const pipCount = await client.query(
+      `SELECT COUNT(*) as count
+       FROM listings.buildings b
+       INNER JOIN listings.regions r ON b.region_id = r.id
+       WHERE r.boundary IS NOT NULL
+         AND ST_Within(b.location::geometry, r.boundary::geometry)`
+    );
+    const pipTotal = parseInt(pipCount.rows[0].count, 10);
+    console.log(`   ✓ Found ${pipTotal} buildings inside region boundaries`);
     if (pipResult.rows.length > 0) {
-      const regionName = pipResult.rows[0].region_name;
-      const regionNameObj = typeof regionName === 'string' ? JSON.parse(regionName) : regionName;
-      console.log(`   Sample: Building ${pipResult.rows[0].id.substring(0, 8)} in region ${regionNameObj?.en || 'N/A'}`);
+      const samples = pipResult.rows.map((r: any) => ({
+        region_id: r.region_id,
+        building_id: r.building_id,
+      }));
+      console.log(`   [spatial] point-in-polygon count=${pipTotal} samples:`, JSON.stringify(samples));
     }
     console.log('');
 
@@ -75,9 +110,9 @@ async function spatialCheck() {
 
     // Summary
     const allChecksPassed = 
-      distanceResult.rows.length > 0 &&
-      bboxResult.rows.length > 0 &&
-      pipResult.rows.length > 0 &&
+      distanceTotal > 0 &&
+      bboxTotal > 0 &&
+      pipTotal > 0 &&
       postgisEnabled;
 
     if (allChecksPassed) {

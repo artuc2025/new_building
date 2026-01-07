@@ -16,12 +16,42 @@ const point = (lng: number, lat: number) => `POINT(${lng} ${lat})`;
 const polygon = (minLng: number, minLat: number, maxLng: number, maxLat: number) =>
   `POLYGON((${minLng} ${minLat}, ${maxLng} ${minLat}, ${maxLng} ${maxLat}, ${minLng} ${maxLat}, ${minLng} ${minLat}))`;
 
+/**
+ * Detect DB configuration mode and print safely (no credentials/URLs)
+ */
+function printDbMode() {
+  const serviceEnvVars = {
+    listings: 'DATABASE_URL_LISTINGS',
+    content: 'DATABASE_URL_CONTENT',
+    media: 'DATABASE_URL_MEDIA',
+    analytics: 'DATABASE_URL_ANALYTICS',
+  };
+
+  // Check if any per-service URL is set
+  const hasPerServiceUrls = Object.values(serviceEnvVars).some(
+    (envVar) => !!process.env[envVar]
+  );
+
+  if (hasPerServiceUrls) {
+    console.log('[seed] DB mode: per-service URLs');
+    for (const [service, envVar] of Object.entries(serviceEnvVars)) {
+      const isSet = !!process.env[envVar];
+      const fallbackSet = !!process.env.DATABASE_URL;
+      console.log(
+        `[seed] ${service}: ${envVar} ${isSet ? '(set)' : '(not set)'} | fallback: DATABASE_URL ${fallbackSet ? '(set)' : '(not set)'}`
+      );
+    }
+  } else {
+    console.log('[seed] DB mode: shared DATABASE_URL');
+    const isSet = !!process.env.DATABASE_URL;
+    console.log(`[seed] all services use DATABASE_URL ${isSet ? '(set)' : '(not set)'}`);
+  }
+  console.log('');
+}
+
 async function seed() {
   console.log('🌱 Starting database seed...');
-  console.log(`  Listings DB: ${getDbUrl('listings')}`);
-  console.log(`  Content DB: ${getDbUrl('content')}`);
-  console.log(`  Media DB: ${getDbUrl('media')}`);
-  console.log(`  Analytics DB: ${getDbUrl('analytics')}\n`);
+  printDbMode();
 
   // Seed each service in its own transaction
   // Note: We seed media first because listings references media IDs
