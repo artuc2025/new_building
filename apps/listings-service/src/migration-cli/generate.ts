@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { resolve } from 'path';
 
 // Parse --name argument (supports both --name=Value and --name Value formats)
@@ -45,15 +45,27 @@ try {
 
   // Use TypeORM CLI via tsx to handle TypeScript DataSource import
   // TypeORM will automatically add timestamp prefix to the migration file
-  execFileSync(
-    'pnpm',
-    ['exec', 'tsx', typeormCliPath, 'migration:generate', '-d', dataSourcePath, migrationPath],
-    {
+  // Use execSync with shell on Windows to find pnpm in PATH, execFileSync on Unix
+  const isWindows = process.platform === 'win32';
+  const pnpmCmd = isWindows ? 'pnpm.cmd' : 'pnpm';
+  const args = ['exec', 'tsx', typeormCliPath, 'migration:generate', '-d', dataSourcePath, migrationPath];
+  
+  if (isWindows) {
+    // On Windows, use execSync with shell to find pnpm.cmd in PATH
+    execSync(`${pnpmCmd} ${args.map(arg => `"${arg}"`).join(' ')}`, {
       cwd: serviceRoot,
       stdio: 'inherit',
       env: { ...process.env },
-    }
-  );
+      shell: true,
+    });
+  } else {
+    // On Unix, use execFileSync to avoid shell quoting issues
+    execFileSync(pnpmCmd, args, {
+      cwd: serviceRoot,
+      stdio: 'inherit',
+      env: { ...process.env },
+    });
+  }
 
   console.log(`✅ Migration generated successfully`);
 } catch (error) {
