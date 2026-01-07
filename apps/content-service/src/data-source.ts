@@ -9,7 +9,7 @@ export const AppDataSource = new DataSource({
   schema: 'content',
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: ['src/**/entities/*.entity.ts'],
+  entities: ['src/entities/**/*.entity.ts'],
   migrations: ['src/migrations/*.ts'],
   migrationsTableName: 'typeorm_migrations',
   migrationsRun: false,

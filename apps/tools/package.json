@@ -1,0 +1,26 @@
+{
+  "name": "@new-building-portal/tools",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "seed": "tsx src/seed/index.ts",
+    "db:spatial-check": "tsx src/scripts/spatial-check.ts",
+    "db:perf": "tsx src/scripts/perf-test.ts"
+  },
+  "dependencies": {
+    "@new-building-portal/listings-service": "workspace:*",
+    "@new-building-portal/media-service": "workspace:*",
+    "@new-building-portal/content-service": "workspace:*",
+    "@new-building-portal/analytics-service": "workspace:*",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "typeorm": "^0.3.17"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/pg": "^8.10.9",
+    "tsx": "^4.7.0",
+    "typescript": "~5.3.0"
+  }
+}
+
