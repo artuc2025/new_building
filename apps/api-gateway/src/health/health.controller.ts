@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import {
   HealthCheckService,
   HealthCheck,
@@ -10,10 +10,10 @@ import { TcpHealthIndicator } from './tcp-health.indicator';
 @Controller()
 export class HealthController {
   constructor(
-    private health: HealthCheckService,
-    private http: HttpHealthIndicator,
-    private tcp: TcpHealthIndicator,
-    private configService: ConfigService,
+    @Inject(HealthCheckService) private health: HealthCheckService,
+    @Inject(HttpHealthIndicator) private http: HttpHealthIndicator,
+    @Inject(TcpHealthIndicator) private tcp: TcpHealthIndicator,
+    @Inject(ConfigService) private configService: ConfigService,
   ) {}
 
   @Get('healthz/live')
