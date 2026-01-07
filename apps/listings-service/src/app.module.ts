@@ -15,7 +15,7 @@ const skipDatabaseConnection = process.env.SKIP_DB_CONNECTION === 'true' || proc
       envFilePath: ['.env.local', '.env'],
     }),
     TypeOrmModule.forRootAsync({
-      useFactory: () => {
+      useFactory: async () => {
         const config: any = {
           type: 'postgres',
           url: process.env.DATABASE_URL || process.env.DATABASE_URL_LISTINGS || 'postgresql://postgres:postgres@localhost:5432/new_building_portal',
@@ -30,9 +30,13 @@ const skipDatabaseConnection = process.env.SKIP_DB_CONNECTION === 'true' || proc
         
         // During OpenAPI generation, prevent connection attempts
         if (skipDatabaseConnection) {
+          // Set retry attempts to 0 to fail immediately
           config.retryAttempts = 0;
           config.retryDelay = 0;
-          // Use a connection that will fail immediately without retrying
+          // Set a very short timeout to fail quickly
+          config.connectTimeoutMS = 1;
+          // Use autoLoadEntities: false to prevent eager connection
+          config.autoLoadEntities = false;
           config.extra = {
             connectionTimeoutMillis: 1,
             query_timeout: 1,
