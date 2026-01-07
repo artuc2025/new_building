@@ -38,7 +38,8 @@
       "options": {
         "command": "tsx scripts/validate-openapi.ts",
         "cwd": "{projectRoot}"
-      }
+      },
+      "dependsOn": ["openapi:generate"]
     }
   },
   "tags": []
