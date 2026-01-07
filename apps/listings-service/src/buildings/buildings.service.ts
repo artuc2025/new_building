@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Building } from '../entities/building.entity';
@@ -10,6 +10,16 @@ import {
   PaginatedBuildingsResponseDto,
 } from './dto';
 
+// Safe sort mapping: enum value -> { column, direction }
+const SORT_MAP: Record<string, { column: string; direction: 'ASC' | 'DESC' }> = {
+  price_asc: { column: 'price_per_m2_min', direction: 'ASC' },
+  price_desc: { column: 'price_per_m2_min', direction: 'DESC' },
+  date_desc: { column: 'updated_at', direction: 'DESC' },
+  date_asc: { column: 'updated_at', direction: 'ASC' },
+  area_asc: { column: 'area_min', direction: 'ASC' },
+  area_desc: { column: 'area_min', direction: 'DESC' },
+};
+
 @Injectable()
 export class BuildingsService {
   constructor(
@@ -17,10 +27,18 @@ export class BuildingsService {
     private buildingsRepository: Repository<Building>,
   ) {}
 
-  async findAll(query: ListBuildingsQueryDto): Promise<PaginatedBuildingsResponseDto> {
+  async findAll(query: ListBuildingsQueryDto, isAdmin: boolean = false): Promise<PaginatedBuildingsResponseDto> {
     const page = query.page || 1;
-    const limit = Math.min(query.limit || 10, 100); // Cap at 100
+    const limit = Math.min(query.limit || 20, 100); // Cap at 100
     const skip = (page - 1) * limit;
+    const currency = query.currency || 'AMD';
+    const sort = query.sort || 'date_desc';
+    const status = query.status || (isAdmin ? 'all' : 'published');
+
+    // Validate sort enum
+    if (!SORT_MAP[sort]) {
+      throw new BadRequestException(`Invalid sort value: ${sort}. Allowed values: ${Object.keys(SORT_MAP).join(', ')}`);
+    }
 
     const qb = this.buildingsRepository
       .createQueryBuilder('building')
@@ -28,13 +46,19 @@ export class BuildingsService {
       .leftJoinAndSelect('building.region', 'region')
       .where('building.deleted_at IS NULL');
 
+    // Apply status filter (admin can see all, public only sees published)
+    if (isAdmin && status === 'all') {
+      // Admin can see all statuses, no filter
+    } else {
+      qb.andWhere('building.status = :status', { status });
+    }
+
     // Apply filters
     this.applyFilters(qb, query);
 
-    // Apply sorting
-    const sortBy = query.sort_by || 'updated_at';
-    const sortOrder = query.sort_order || 'desc';
-    qb.orderBy(`building.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
+    // Apply safe sorting
+    const sortConfig = SORT_MAP[sort];
+    qb.orderBy(`building.${sortConfig.column}`, sortConfig.direction);
 
     // Get total count
     const total = await qb.getCount();
@@ -44,38 +68,80 @@ export class BuildingsService {
 
     const buildings = await qb.getMany();
 
+    const totalPages = Math.ceil(total / limit);
+
     return {
-      data: buildings.map((b) => this.toResponseDto(b)),
-      total,
-      page,
-      limit,
-      total_pages: Math.ceil(total / limit),
+      data: buildings.map((b) => this.toResponseDto(b, currency)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+      meta: {
+        currency,
+        exchangeRate: 1.0, // TODO: Implement currency conversion
+        sort,
+      },
     };
   }
 
-  async findOne(id: string): Promise<BuildingResponseDto> {
+  async findOne(id: string, currency: string = 'AMD'): Promise<BuildingResponseDto> {
     const building = await this.buildingsRepository.findOne({
       where: { id, deleted_at: null },
       relations: ['developer', 'region'],
     });
 
     if (!building) {
-      throw new NotFoundException(`Building with ID ${id} not found`);
+      throw new NotFoundException({
+        code: 'BUILDING_NOT_FOUND',
+        message: `Building with ID '${id}' not found`,
+        details: { buildingId: id },
+      });
     }
 
-    return this.toResponseDto(building);
+    return this.toResponseDto(building, currency);
   }
 
   async create(createDto: CreateBuildingDto): Promise<BuildingResponseDto> {
-    const building = this.buildingsRepository.create({
-      ...createDto,
-      location: `POINT(${createDto.location.longitude} ${createDto.location.latitude})`,
-      status: createDto.status || 'draft',
-      currency: createDto.currency || 'AMD',
+    // Transform camelCase to snake_case for database
+    const buildingData: any = {
+      title: createDto.title,
+      description: createDto.description,
+      address: createDto.address,
+      address_line_1: createDto.address_line_1,
+      address_line_2: createDto.address_line_2,
       city: createDto.city || 'Yerevan',
-      is_featured: createDto.is_featured || false,
-    });
+      postal_code: createDto.postal_code,
+      floors: createDto.floors,
+      total_units: createDto.totalUnits,
+      commissioning_date: createDto.commissioningDate,
+      construction_status: createDto.constructionStatus,
+      price_per_m2_min: createDto.pricePerM2Min,
+      price_per_m2_max: createDto.pricePerM2Max,
+      area_min: createDto.areaMin,
+      area_max: createDto.areaMax,
+      currency: createDto.currency || 'AMD',
+      developer_id: createDto.developerId,
+      region_id: createDto.regionId,
+      status: createDto.status || 'draft',
+      is_featured: createDto.isFeatured || false,
+      developer_website_url: createDto.developerWebsiteUrl,
+      developer_facebook_url: createDto.developerFacebookUrl,
+      developer_instagram_url: createDto.developerInstagramUrl,
+    };
 
+    // Handle location: convert {lat, lng} to PostGIS Point WKT format
+    if (createDto.location) {
+      // TypeORM geography column expects WKT format: 'POINT(lng lat)'
+      const lng = createDto.location.lng;
+      const lat = createDto.location.lat;
+      buildingData.location = `POINT(${lng} ${lat})`;
+    }
+
+    const building = this.buildingsRepository.create(buildingData);
     const saved = await this.buildingsRepository.save(building);
     return this.findOne(saved.id);
   }
@@ -86,125 +152,181 @@ export class BuildingsService {
     });
 
     if (!building) {
-      throw new NotFoundException(`Building with ID ${id} not found`);
+      throw new NotFoundException({
+        code: 'BUILDING_NOT_FOUND',
+        message: `Building with ID '${id}' not found`,
+        details: { buildingId: id },
+      });
     }
 
-    const updateData: any = { ...updateDto };
+    // Transform camelCase to snake_case for database
+    const updateData: any = {};
+    
+    if (updateDto.title !== undefined) updateData.title = updateDto.title;
+    if (updateDto.description !== undefined) updateData.description = updateDto.description;
+    if (updateDto.address !== undefined) updateData.address = updateDto.address;
+    if (updateDto.address_line_1 !== undefined) updateData.address_line_1 = updateDto.address_line_1;
+    if (updateDto.address_line_2 !== undefined) updateData.address_line_2 = updateDto.address_line_2;
+    if (updateDto.city !== undefined) updateData.city = updateDto.city;
+    if (updateDto.postal_code !== undefined) updateData.postal_code = updateDto.postal_code;
+    if (updateDto.floors !== undefined) updateData.floors = updateDto.floors;
+    if (updateDto.totalUnits !== undefined) updateData.total_units = updateDto.totalUnits;
+    if (updateDto.commissioningDate !== undefined) updateData.commissioning_date = updateDto.commissioningDate;
+    if (updateDto.constructionStatus !== undefined) updateData.construction_status = updateDto.constructionStatus;
+    if (updateDto.pricePerM2Min !== undefined) updateData.price_per_m2_min = updateDto.pricePerM2Min;
+    if (updateDto.pricePerM2Max !== undefined) updateData.price_per_m2_max = updateDto.pricePerM2Max;
+    if (updateDto.areaMin !== undefined) updateData.area_min = updateDto.areaMin;
+    if (updateDto.areaMax !== undefined) updateData.area_max = updateDto.areaMax;
+    if (updateDto.currency !== undefined) updateData.currency = updateDto.currency;
+    if (updateDto.developerId !== undefined) updateData.developer_id = updateDto.developerId;
+    if (updateDto.regionId !== undefined) updateData.region_id = updateDto.regionId;
+    if (updateDto.status !== undefined) updateData.status = updateDto.status;
+    if (updateDto.isFeatured !== undefined) updateData.is_featured = updateDto.isFeatured;
+    if (updateDto.developerWebsiteUrl !== undefined) updateData.developer_website_url = updateDto.developerWebsiteUrl;
+    if (updateDto.developerFacebookUrl !== undefined) updateData.developer_facebook_url = updateDto.developerFacebookUrl;
+    if (updateDto.developerInstagramUrl !== undefined) updateData.developer_instagram_url = updateDto.developerInstagramUrl;
 
-    // Handle location update
+    // Handle location update: convert {lat, lng} to PostGIS Point WKT format
     if (updateDto.location) {
-      updateData.location = `POINT(${updateDto.location.longitude} ${updateDto.location.latitude})`;
+      const lng = updateDto.location.lng;
+      const lat = updateDto.location.lat;
+      updateData.location = `POINT(${lng} ${lat})`;
     }
 
     await this.buildingsRepository.update(id, updateData);
     return this.findOne(id);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string): Promise<{ data: { id: string; status: string; deletedAt: string } }> {
     const building = await this.buildingsRepository.findOne({
       where: { id, deleted_at: null },
     });
 
     if (!building) {
-      throw new NotFoundException(`Building with ID ${id} not found`);
+      throw new NotFoundException({
+        code: 'BUILDING_NOT_FOUND',
+        message: `Building with ID '${id}' not found`,
+        details: { buildingId: id },
+      });
     }
 
-    // Soft delete
+    // Soft delete: set status to archived and deleted_at
+    const deletedAt = new Date();
     await this.buildingsRepository.update(id, {
-      deleted_at: new Date(),
+      status: 'archived',
+      deleted_at: deletedAt,
     });
+
+    return {
+      data: {
+        id: building.id,
+        status: 'archived',
+        deletedAt: deletedAt.toISOString(),
+      },
+    };
   }
 
   private applyFilters(qb: SelectQueryBuilder<Building>, query: ListBuildingsQueryDto): void {
     // Price range filter
-    if (query.min_price !== undefined) {
-      qb.andWhere('building.price_per_m2_min >= :min_price', { min_price: query.min_price });
+    if (query.price_min !== undefined) {
+      qb.andWhere('building.price_per_m2_min >= :price_min', { price_min: query.price_min });
     }
-    if (query.max_price !== undefined) {
-      qb.andWhere('building.price_per_m2_max <= :max_price', { max_price: query.max_price });
+    if (query.price_max !== undefined) {
+      qb.andWhere('building.price_per_m2_max <= :price_max', { price_max: query.price_max });
     }
 
     // Area range filter
-    if (query.min_area !== undefined) {
-      qb.andWhere('building.area_min >= :min_area', { min_area: query.min_area });
+    if (query.area_min !== undefined) {
+      qb.andWhere('building.area_min >= :area_min', { area_min: query.area_min });
     }
-    if (query.max_area !== undefined) {
-      qb.andWhere('building.area_max <= :max_area', { max_area: query.max_area });
+    if (query.area_max !== undefined) {
+      qb.andWhere('building.area_max <= :area_max', { area_max: query.area_max });
+    }
+
+    // Floors range filter
+    if (query.floors_min !== undefined) {
+      qb.andWhere('building.floors >= :floors_min', { floors_min: query.floors_min });
+    }
+    if (query.floors_max !== undefined) {
+      qb.andWhere('building.floors <= :floors_max', { floors_max: query.floors_max });
     }
 
     // Developer filter
-    if (query.developerId) {
-      qb.andWhere('building.developer_id = :developerId', { developerId: query.developerId });
+    if (query.developer_id) {
+      qb.andWhere('building.developer_id = :developer_id', { developer_id: query.developer_id });
     }
 
     // Region filter
-    if (query.regionId) {
-      qb.andWhere('building.region_id = :regionId', { regionId: query.regionId });
+    if (query.region_id) {
+      qb.andWhere('building.region_id = :region_id', { region_id: query.region_id });
     }
 
     // Commissioning date filters
     if (query.commissioning_date_from) {
-      qb.andWhere('building.commissioning_date >= :dateFrom', {
-        dateFrom: query.commissioning_date_from,
+      qb.andWhere('building.commissioning_date >= :commissioning_date_from', {
+        commissioning_date_from: query.commissioning_date_from,
       });
     }
     if (query.commissioning_date_to) {
-      qb.andWhere('building.commissioning_date <= :dateTo', {
-        dateTo: query.commissioning_date_to,
+      qb.andWhere('building.commissioning_date <= :commissioning_date_to', {
+        commissioning_date_to: query.commissioning_date_to,
       });
-    }
-
-    // Bounding box filter (simplified for Sprint 2)
-    if (query.bbox) {
-      const [minLon, minLat, maxLon, maxLat] = query.bbox.split(',').map(Number);
-      if (
-        !isNaN(minLon) &&
-        !isNaN(minLat) &&
-        !isNaN(maxLon) &&
-        !isNaN(maxLat) &&
-        minLon < maxLon &&
-        minLat < maxLat
-      ) {
-        qb.andWhere(
-          `ST_Within(building.location, ST_MakeEnvelope(:minLon, :minLat, :maxLon, :maxLat, 4326))`,
-          { minLon, minLat, maxLon, maxLat },
-        );
-      }
     }
   }
 
-  private toResponseDto(building: Building): BuildingResponseDto {
+  private toResponseDto(building: Building, currency: string = 'AMD'): BuildingResponseDto {
+    // Extract lat/lng from PostGIS Point
+    // The location is stored as geography(POINT, 4326)
+    // We need to extract coordinates using ST_X and ST_Y
+    let location: { lat: number; lng: number } = { lat: 0, lng: 0 };
+    
+    // If location is a string (WKT format), parse it
+    if (typeof building.location === 'string') {
+      const match = building.location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+      if (match) {
+        location = { lng: parseFloat(match[1]), lat: parseFloat(match[2]) };
+      }
+    } else if (building.location && typeof building.location === 'object') {
+      // If it's already an object with coordinates
+      const coords = (building.location as any).coordinates || (building.location as any);
+      if (Array.isArray(coords) && coords.length >= 2) {
+        location = { lng: coords[0], lat: coords[1] };
+      } else if (coords.lat !== undefined && coords.lng !== undefined) {
+        location = { lat: coords.lat, lng: coords.lng };
+      }
+    }
+
+    // Transform to camelCase for API response
     return {
       id: building.id,
       title: building.title,
       description: building.description,
       address: building.address,
-      location: building.location,
-      address_line_1: building.address_line_1,
-      address_line_2: building.address_line_2,
+      location,
+      addressLine1: building.address_line_1,
+      addressLine2: building.address_line_2,
       city: building.city,
-      postal_code: building.postal_code,
+      postalCode: building.postal_code,
       floors: building.floors,
-      total_units: building.total_units,
-      commissioning_date: building.commissioning_date,
-      construction_status: building.construction_status,
-      price_per_m2_min: building.price_per_m2_min ? Number(building.price_per_m2_min) : undefined,
-      price_per_m2_max: building.price_per_m2_max ? Number(building.price_per_m2_max) : undefined,
-      area_min: Number(building.area_min),
-      area_max: Number(building.area_max),
+      totalUnits: building.total_units,
+      commissioningDate: building.commissioning_date ? (building.commissioning_date instanceof Date ? building.commissioning_date.toISOString().split('T')[0] : building.commissioning_date) : undefined,
+      constructionStatus: building.construction_status,
+      pricePerM2Min: building.price_per_m2_min ? Number(building.price_per_m2_min) : undefined,
+      pricePerM2Max: building.price_per_m2_max ? Number(building.price_per_m2_max) : undefined,
+      areaMin: Number(building.area_min),
+      areaMax: Number(building.area_max),
       currency: building.currency,
-      developer_id: building.developer_id,
-      region_id: building.region_id,
+      developerId: building.developer_id,
+      regionId: building.region_id,
       status: building.status,
-      is_featured: building.is_featured,
-      developer_website_url: building.developer_website_url,
-      developer_facebook_url: building.developer_facebook_url,
-      developer_instagram_url: building.developer_instagram_url,
-      created_at: building.created_at,
-      updated_at: building.updated_at,
-      published_at: building.published_at,
-      created_by: building.created_by,
-    };
+      isFeatured: building.is_featured,
+      developerWebsiteUrl: building.developer_website_url,
+      developerFacebookUrl: building.developer_facebook_url,
+      developerInstagramUrl: building.developer_instagram_url,
+      createdAt: building.created_at ? (building.created_at instanceof Date ? building.created_at.toISOString() : building.created_at) : undefined,
+      updatedAt: building.updated_at ? (building.updated_at instanceof Date ? building.updated_at.toISOString() : building.updated_at) : undefined,
+      publishedAt: building.published_at ? (building.published_at instanceof Date ? building.published_at.toISOString() : building.published_at) : undefined,
+      createdBy: building.created_by,
+    } as BuildingResponseDto;
   }
 }
-

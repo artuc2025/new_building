@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { ListingsController } from './listings.controller';
+import { ListingsController, AdminListingsController } from './listings.controller';
+import { AdminGuard } from '../common/guards/admin.guard';
 
 @Module({
   imports: [
@@ -9,7 +10,8 @@ import { ListingsController } from './listings.controller';
       maxRedirects: 5,
     }),
   ],
-  controllers: [ListingsController],
+  controllers: [ListingsController, AdminListingsController],
+  providers: [AdminGuard],
 })
 export class ListingsModule {}
 

@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   Req,
+  UseGuards,
   HttpCode,
   HttpStatus,
   HttpException,
@@ -17,6 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { firstValueFrom, timeout, catchError } from 'rxjs';
 import { AxiosError } from 'axios';
+import { AdminGuard } from '../common/guards/admin.guard';
 
 @Controller('api/v1/buildings')
 export class ListingsController {
@@ -59,6 +61,11 @@ export class ListingsController {
         }
       });
 
+      // Forward x-request-id if present
+      if (req.headers['x-request-id']) {
+        headers['x-request-id'] = req.headers['x-request-id'] as string;
+      }
+
       // Make request with timeout
       const response = await firstValueFrom(
         this.httpService
@@ -73,47 +80,62 @@ export class ListingsController {
           .pipe(
             timeout(timeoutMs),
             catchError((error: AxiosError) => {
-              // Normalize axios errors
+              // Normalize axios errors to README error format
               if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+                const requestId = req.headers['x-request-id'] as string || 'unknown';
                 throw new HttpException(
                   {
-                    statusCode: HttpStatus.GATEWAY_TIMEOUT,
-                    message: 'Request to listings service timed out',
-                    error: 'Gateway Timeout',
-                    timestamp: new Date().toISOString(),
-                    path: req.url,
+                    error: {
+                      code: 'GATEWAY_TIMEOUT',
+                      message: 'Request to listings service timed out',
+                      details: { service: 'listings-service', timeout: timeoutMs },
+                      requestId,
+                      statusCode: HttpStatus.GATEWAY_TIMEOUT,
+                    },
                   },
                   HttpStatus.GATEWAY_TIMEOUT,
                 );
               }
 
               if (error.response) {
-                // Forward error response from upstream service
+                // Forward error response from upstream service (already in README format)
                 const status = error.response.status;
-                const data = error.response.data;
+                const data = error.response.data as any;
+                
+                // If upstream already has error envelope, forward it
+                if (data?.error) {
+                  throw new HttpException(data, status);
+                }
+                
+                // Otherwise, normalize to README format
+                const requestId = data?.error?.requestId || req.headers['x-request-id'] as string || 'unknown';
                 throw new HttpException(
                   {
-                    statusCode: status,
-                    message: (data as any)?.message || error.message,
-                    error: (data as any)?.error || 'Bad Gateway',
-                    details: (data as any)?.details,
-                    timestamp: new Date().toISOString(),
-                    path: req.url,
+                    error: {
+                      code: status >= 500 ? 'SERVICE_UNAVAILABLE' : this.getErrorCodeFromStatus(status),
+                      message: data?.message || data?.error?.message || error.message || 'Request failed',
+                      details: data?.details || data?.error?.details,
+                      requestId,
+                      statusCode: status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : status,
+                    },
                   },
-                  status,
+                  status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : status,
                 );
               }
 
               // Network or other errors
+              const requestId = req.headers['x-request-id'] as string || 'unknown';
               throw new HttpException(
                 {
-                  statusCode: HttpStatus.BAD_GATEWAY,
-                  message: 'Failed to connect to listings service',
-                  error: 'Bad Gateway',
-                  timestamp: new Date().toISOString(),
-                  path: req.url,
+                  error: {
+                    code: 'SERVICE_UNAVAILABLE',
+                    message: 'Failed to connect to listings service',
+                    details: { service: 'listings-service', error: error.message },
+                    requestId,
+                    statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+                  },
                 },
-                HttpStatus.BAD_GATEWAY,
+                HttpStatus.SERVICE_UNAVAILABLE,
               );
             }),
           ),
@@ -122,16 +144,25 @@ export class ListingsController {
       // Handle non-2xx status codes
       if (response.status >= 400) {
         const errorData = response.data || {};
+        
+        // If upstream already has error envelope, forward it
+        if (errorData.error) {
+          throw new HttpException(errorData, response.status);
+        }
+        
+        // Otherwise, normalize to README format
+        const requestId = errorData.error?.requestId || req.headers['x-request-id'] as string || 'unknown';
         throw new HttpException(
           {
-            statusCode: response.status,
-            message: errorData.message || 'Request failed',
-            error: errorData.error || 'Bad Request',
-            details: errorData.details,
-            timestamp: new Date().toISOString(),
-            path: req.url,
+            error: {
+              code: response.status >= 500 ? 'SERVICE_UNAVAILABLE' : this.getErrorCodeFromStatus(response.status),
+              message: errorData.message || errorData.error?.message || 'Request failed',
+              details: errorData.details || errorData.error?.details,
+              requestId,
+              statusCode: response.status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : response.status,
+            },
           },
-          response.status,
+          response.status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : response.status,
         );
       }
 
@@ -147,16 +178,42 @@ export class ListingsController {
       }
 
       // Unexpected errors
+      const requestId = req.headers['x-request-id'] as string || 'unknown';
       throw new HttpException(
         {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Internal gateway error',
-          error: 'Internal Server Error',
-          timestamp: new Date().toISOString(),
-          path: req.url,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'Internal gateway error',
+            details: { error: error instanceof Error ? error.message : 'Unknown error' },
+            requestId,
+            statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          },
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+  }
+
+  private getErrorCodeFromStatus(status: number): string {
+    switch (status) {
+      case HttpStatus.BAD_REQUEST:
+        return 'BAD_REQUEST';
+      case HttpStatus.UNAUTHORIZED:
+        return 'UNAUTHORIZED';
+      case HttpStatus.FORBIDDEN:
+        return 'FORBIDDEN';
+      case HttpStatus.NOT_FOUND:
+        return 'NOT_FOUND';
+      case HttpStatus.CONFLICT:
+        return 'CONFLICT';
+      case HttpStatus.UNPROCESSABLE_ENTITY:
+        return 'VALIDATION_ERROR';
+      case HttpStatus.TOO_MANY_REQUESTS:
+        return 'RATE_LIMIT_EXCEEDED';
+      case HttpStatus.SERVICE_UNAVAILABLE:
+        return 'SERVICE_UNAVAILABLE';
+      default:
+        return 'INTERNAL_ERROR';
     }
   }
 
@@ -168,25 +225,197 @@ export class ListingsController {
   }
 
   @Get(':id')
+  async findOne(@Param('id') id: string, @Req() req: Request, @Query() query: any): Promise<any> {
+    const queryString = new URLSearchParams(query).toString();
+    const path = `/v1/buildings/${id}${queryString ? `?${queryString}` : ''}`;
+    return this.proxyRequest('GET', path, req);
+  }
+}
+
+@Controller('api/v1/admin/buildings')
+@UseGuards(AdminGuard)
+export class AdminListingsController {
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private getListingsServiceUrl(): string {
+    return (
+      this.configService.get<string>('LISTINGS_SERVICE_URL') ||
+      'http://localhost:3001'
+    );
+  }
+
+  private getTimeout(): number {
+    return this.configService.get<number>('LISTINGS_SERVICE_TIMEOUT', 10000);
+  }
+
+  private async proxyRequest(
+    method: string,
+    path: string,
+    req: Request,
+    body?: any,
+  ): Promise<any> {
+    const baseUrl = this.getListingsServiceUrl();
+    const url = `${baseUrl}${path}`;
+    const timeoutMs = this.getTimeout();
+
+    try {
+      const headers: Record<string, string> = {};
+      Object.keys(req.headers).forEach((key) => {
+        const lowerKey = key.toLowerCase();
+        if (
+          !['host', 'connection', 'content-length'].includes(lowerKey) &&
+          req.headers[key]
+        ) {
+          headers[key] = req.headers[key] as string;
+        }
+      });
+
+      if (req.headers['x-request-id']) {
+        headers['x-request-id'] = req.headers['x-request-id'] as string;
+      }
+
+      // Forward admin key to upstream service
+      if (req.headers['x-admin-key']) {
+        headers['x-admin-key'] = req.headers['x-admin-key'] as string;
+      }
+
+      const response = await firstValueFrom(
+        this.httpService
+          .request({
+            method: method as any,
+            url,
+            headers,
+            data: body,
+            timeout: timeoutMs,
+            validateStatus: () => true,
+          })
+          .pipe(
+            timeout(timeoutMs),
+            catchError((error: AxiosError) => {
+              const requestId = req.headers['x-request-id'] as string || 'unknown';
+              if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+                throw new HttpException(
+                  {
+                    error: {
+                      code: 'GATEWAY_TIMEOUT',
+                      message: 'Request to listings service timed out',
+                      details: { service: 'listings-service', timeout: timeoutMs },
+                      requestId,
+                      statusCode: HttpStatus.GATEWAY_TIMEOUT,
+                    },
+                  },
+                  HttpStatus.GATEWAY_TIMEOUT,
+                );
+              }
+
+              if (error.response) {
+                const status = error.response.status;
+                const data = error.response.data as any;
+                if (data?.error) {
+                  throw new HttpException(data, status);
+                }
+                throw new HttpException(
+                  {
+                    error: {
+                      code: status >= 500 ? 'SERVICE_UNAVAILABLE' : 'BAD_REQUEST',
+                      message: data?.message || error.message || 'Request failed',
+                      details: data?.details,
+                      requestId,
+                      statusCode: status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : status,
+                    },
+                  },
+                  status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : status,
+                );
+              }
+
+              throw new HttpException(
+                {
+                  error: {
+                    code: 'SERVICE_UNAVAILABLE',
+                    message: 'Failed to connect to listings service',
+                    details: { service: 'listings-service' },
+                    requestId,
+                    statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+                  },
+                },
+                HttpStatus.SERVICE_UNAVAILABLE,
+              );
+            }),
+          ),
+      );
+
+      if (response.status >= 400) {
+        const errorData = response.data || {};
+        if (errorData.error) {
+          throw new HttpException(errorData, response.status);
+        }
+        const requestId = req.headers['x-request-id'] as string || 'unknown';
+        throw new HttpException(
+          {
+            error: {
+              code: response.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'BAD_REQUEST',
+              message: errorData.message || 'Request failed',
+              details: errorData.details,
+              requestId,
+              statusCode: response.status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : response.status,
+            },
+          },
+          response.status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : response.status,
+        );
+      }
+
+      if (response.status === 204) {
+        return undefined;
+      }
+      return response.data;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      const requestId = req.headers['x-request-id'] as string || 'unknown';
+      throw new HttpException(
+        {
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'Internal gateway error',
+            requestId,
+            statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          },
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get()
+  async findAll(@Req() req: Request, @Query() query: any): Promise<any> {
+    const queryString = new URLSearchParams(query).toString();
+    const path = `/v1/admin/buildings${queryString ? `?${queryString}` : ''}`;
+    return this.proxyRequest('GET', path, req);
+  }
+
+  @Get(':id')
   async findOne(@Param('id') id: string, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('GET', `/v1/buildings/${id}`, req);
+    return this.proxyRequest('GET', `/v1/admin/buildings/${id}`, req);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() body: any, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('POST', '/v1/buildings', req, body);
+    return this.proxyRequest('POST', '/v1/admin/buildings', req, body);
   }
 
   @Put(':id')
   async update(@Param('id') id: string, @Body() body: any, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('PUT', `/v1/buildings/${id}`, req, body);
+    return this.proxyRequest('PUT', `/v1/admin/buildings/${id}`, req, body);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req: Request): Promise<void> {
-    await this.proxyRequest('DELETE', `/v1/buildings/${id}`, req);
+  @HttpCode(HttpStatus.OK)
+  async remove(@Param('id') id: string, @Req() req: Request): Promise<any> {
+    return this.proxyRequest('DELETE', `/v1/admin/buildings/${id}`, req);
   }
 }
-

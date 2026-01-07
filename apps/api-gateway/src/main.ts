@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -29,8 +30,29 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // OpenAPI/Swagger setup
+  const config = new DocumentBuilder()
+    .setTitle('API Gateway')
+    .setDescription('API Gateway for New Building Portal')
+    .setVersion('1.0')
+    .addTag('buildings', 'Public building endpoints')
+    .addTag('admin-buildings', 'Admin building endpoints')
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-admin-key',
+        in: 'header',
+        description: 'Admin API key for admin endpoints',
+      },
+      'admin-key',
+    )
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
   await app.listen(port);
   console.log(`API Gateway is running on: http://localhost:${port}`);
+  console.log(`Swagger UI available at: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

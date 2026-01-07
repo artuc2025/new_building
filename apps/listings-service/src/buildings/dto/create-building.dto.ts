@@ -12,21 +12,22 @@ import {
   Max,
   ValidateNested,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 class LocationDto {
-  @ApiProperty({ description: 'Longitude', example: 44.5091 })
-  @IsNumber()
-  @Min(-180)
-  @Max(180)
-  longitude: number;
-
   @ApiProperty({ description: 'Latitude', example: 40.1811 })
   @IsNumber()
   @Min(-90)
   @Max(90)
-  latitude: number;
+  lat: number;
+
+  @ApiProperty({ description: 'Longitude', example: 44.5091 })
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  lng: number;
 }
 
 export class CreateBuildingDto {
@@ -91,12 +92,13 @@ export class CreateBuildingDto {
   @IsOptional()
   @IsNumber()
   @Min(1)
-  total_units?: number;
+  @Transform(({ value }) => value !== undefined ? value : undefined)
+  totalUnits?: number;
 
   @ApiProperty({ description: 'Commissioning date (ISO date string)', required: false })
   @IsOptional()
   @IsDateString()
-  commissioning_date?: string;
+  commissioningDate?: string;
 
   @ApiProperty({
     description: 'Construction status',
@@ -105,31 +107,31 @@ export class CreateBuildingDto {
   })
   @IsOptional()
   @IsEnum(['planned', 'under_construction', 'completed'])
-  construction_status?: 'planned' | 'under_construction' | 'completed';
+  constructionStatus?: 'planned' | 'under_construction' | 'completed';
 
   @ApiProperty({ description: 'Minimum price per m²', required: false })
   @IsOptional()
   @IsNumber()
   @Min(0)
-  price_per_m2_min?: number;
+  pricePerM2Min?: number;
 
   @ApiProperty({ description: 'Maximum price per m²', required: false })
   @IsOptional()
   @IsNumber()
   @Min(0)
-  price_per_m2_max?: number;
+  pricePerM2Max?: number;
 
-  @ApiProperty({ description: 'Minimum area (m²)', example: 50 })
+  @ApiProperty({ description: 'Minimum area (m²)', example: 45 })
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
-  area_min: number;
+  areaMin: number;
 
-  @ApiProperty({ description: 'Maximum area (m²)', example: 150 })
+  @ApiProperty({ description: 'Maximum area (m²)', example: 120 })
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
-  area_max: number;
+  areaMax: number;
 
   @ApiProperty({ description: 'Currency code', example: 'AMD', default: 'AMD' })
   @IsOptional()
@@ -139,12 +141,12 @@ export class CreateBuildingDto {
   @ApiProperty({ description: 'Developer ID (UUID)' })
   @IsNotEmpty()
   @IsUUID()
-  developer_id: string;
+  developerId: string;
 
   @ApiProperty({ description: 'Region ID (UUID)' })
   @IsNotEmpty()
   @IsUUID()
-  region_id: string;
+  regionId: string;
 
   @ApiProperty({
     description: 'Status',
@@ -159,21 +161,27 @@ export class CreateBuildingDto {
   @ApiProperty({ description: 'Is featured', default: false, required: false })
   @IsOptional()
   @IsBoolean()
-  is_featured?: boolean;
+  isFeatured?: boolean;
 
   @ApiProperty({ description: 'Developer website URL', required: false })
   @IsOptional()
   @IsString()
-  developer_website_url?: string;
+  developerWebsiteUrl?: string;
 
   @ApiProperty({ description: 'Developer Facebook URL', required: false })
   @IsOptional()
   @IsString()
-  developer_facebook_url?: string;
+  developerFacebookUrl?: string;
 
   @ApiProperty({ description: 'Developer Instagram URL', required: false })
   @IsOptional()
   @IsString()
-  developer_instagram_url?: string;
+  developerInstagramUrl?: string;
+
+  @ApiProperty({ description: 'Image IDs (UUIDs)', type: [String], required: false })
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  imageIds?: string[];
 }
 

@@ -12,91 +12,108 @@ import {
 } from 'class-validator';
 
 export class ListBuildingsQueryDto {
-  @ApiPropertyOptional({ description: 'Page number (1-based)', example: 1, default: 1 })
+  @ApiPropertyOptional({ description: 'Page number (1-based)', example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10, maximum: 100 })
+  @ApiPropertyOptional({ description: 'Items per page', example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(100)
-  limit?: number = 10;
+  limit?: number = 20;
 
-  @ApiPropertyOptional({ description: 'Minimum price per m²' })
+  @ApiPropertyOptional({ description: 'Minimum price per m² (in selected currency)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  min_price?: number;
+  price_min?: number;
 
-  @ApiPropertyOptional({ description: 'Maximum price per m²' })
+  @ApiPropertyOptional({ description: 'Maximum price per m² (in selected currency)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  max_price?: number;
+  price_max?: number;
 
   @ApiPropertyOptional({ description: 'Minimum area (m²)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  min_area?: number;
+  area_min?: number;
 
   @ApiPropertyOptional({ description: 'Maximum area (m²)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  max_area?: number;
+  area_max?: number;
+
+  @ApiPropertyOptional({ description: 'Minimum number of floors' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  floors_min?: number;
+
+  @ApiPropertyOptional({ description: 'Maximum number of floors' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  floors_max?: number;
 
   @ApiPropertyOptional({ description: 'Developer ID (UUID)' })
   @IsOptional()
   @IsUUID()
-  developerId?: string;
+  developer_id?: string;
 
   @ApiPropertyOptional({ description: 'Region ID (UUID)' })
   @IsOptional()
   @IsUUID()
-  regionId?: string;
+  region_id?: string;
 
-  @ApiPropertyOptional({ description: 'Commissioning date from (ISO date string)' })
+  @ApiPropertyOptional({ description: 'Commissioning date from (ISO 8601 date string)' })
   @IsOptional()
   @IsDateString()
   commissioning_date_from?: string;
 
-  @ApiPropertyOptional({ description: 'Commissioning date to (ISO date string)' })
+  @ApiPropertyOptional({ description: 'Commissioning date to (ISO 8601 date string)' })
   @IsOptional()
   @IsDateString()
   commissioning_date_to?: string;
 
   @ApiPropertyOptional({
-    description: 'Sort field',
-    enum: ['updated_at', 'price_per_m2_min', 'area_min', 'commissioning_date'],
-    default: 'updated_at',
+    description: 'Status filter (public: published only; admin: draft, published, archived, all)',
+    enum: ['published', 'draft', 'archived', 'all'],
+    default: 'published',
   })
   @IsOptional()
-  @IsEnum(['updated_at', 'price_per_m2_min', 'area_min', 'commissioning_date'])
-  sort_by?: string = 'updated_at';
+  @IsEnum(['published', 'draft', 'archived', 'all'])
+  status?: string = 'published';
 
   @ApiPropertyOptional({
-    description: 'Sort order',
-    enum: ['asc', 'desc'],
-    default: 'desc',
+    description: 'Sort option',
+    enum: ['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc'],
+    default: 'date_desc',
   })
   @IsOptional()
-  @IsEnum(['asc', 'desc'])
-  sort_order?: 'asc' | 'desc' = 'desc';
+  @IsEnum(['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc'])
+  sort?: string = 'date_desc';
 
-  // Location filters (bbox or radius - simplified for Sprint 2)
-  @ApiPropertyOptional({ description: 'Bounding box: min longitude,min latitude,max longitude,max latitude' })
+  @ApiPropertyOptional({
+    description: 'Currency for price filtering and conversion',
+    enum: ['AMD', 'USD'],
+    default: 'AMD',
+  })
   @IsOptional()
-  @IsString()
-  bbox?: string; // Format: "minLon,minLat,maxLon,maxLat"
+  @IsEnum(['AMD', 'USD'])
+  currency?: string = 'AMD';
 }
 

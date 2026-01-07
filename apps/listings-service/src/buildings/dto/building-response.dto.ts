@@ -13,57 +13,57 @@ export class BuildingResponseDto {
   @ApiProperty({ description: 'Building address in multiple languages' })
   address: Record<string, string>;
 
-  @ApiProperty({ description: 'Geographic location (WKT POINT format)' })
-  location: string;
+  @ApiProperty({ description: 'Geographic location', example: { lat: 40.1811, lng: 44.5144 } })
+  location: { lat: number; lng: number };
 
   @ApiProperty({ description: 'Address line 1', required: false })
-  address_line_1?: string;
+  addressLine1?: string;
 
   @ApiProperty({ description: 'Address line 2', required: false })
-  address_line_2?: string;
+  addressLine2?: string;
 
   @ApiProperty({ description: 'City' })
   city: string;
 
   @ApiProperty({ description: 'Postal code', required: false })
-  postal_code?: string;
+  postalCode?: string;
 
   @ApiProperty({ description: 'Number of floors' })
   floors: number;
 
   @ApiProperty({ description: 'Total units', required: false })
-  total_units?: number;
+  totalUnits?: number;
 
   @ApiProperty({ description: 'Commissioning date', required: false })
-  commissioning_date?: Date;
+  commissioningDate?: Date | string;
 
   @ApiProperty({
     description: 'Construction status',
     enum: ['planned', 'under_construction', 'completed'],
     required: false,
   })
-  construction_status?: 'planned' | 'under_construction' | 'completed';
+  constructionStatus?: 'planned' | 'under_construction' | 'completed';
 
   @ApiProperty({ description: 'Minimum price per m²', required: false })
-  price_per_m2_min?: number;
+  pricePerM2Min?: number;
 
   @ApiProperty({ description: 'Maximum price per m²', required: false })
-  price_per_m2_max?: number;
+  pricePerM2Max?: number;
 
   @ApiProperty({ description: 'Minimum area (m²)' })
-  area_min: number;
+  areaMin: number;
 
   @ApiProperty({ description: 'Maximum area (m²)' })
-  area_max: number;
+  areaMax: number;
 
   @ApiProperty({ description: 'Currency code' })
   currency: string;
 
   @ApiProperty({ description: 'Developer ID (UUID)' })
-  developer_id: string;
+  developerId: string;
 
   @ApiProperty({ description: 'Region ID (UUID)' })
-  region_id: string;
+  regionId: string;
 
   @ApiProperty({
     description: 'Status',
@@ -72,27 +72,27 @@ export class BuildingResponseDto {
   status: 'draft' | 'published' | 'archived';
 
   @ApiProperty({ description: 'Is featured', required: false })
-  is_featured?: boolean;
+  isFeatured?: boolean;
 
   @ApiProperty({ description: 'Developer website URL', required: false })
-  developer_website_url?: string;
+  developerWebsiteUrl?: string;
 
   @ApiProperty({ description: 'Developer Facebook URL', required: false })
-  developer_facebook_url?: string;
+  developerFacebookUrl?: string;
 
   @ApiProperty({ description: 'Developer Instagram URL', required: false })
-  developer_instagram_url?: string;
+  developerInstagramUrl?: string;
 
   @ApiProperty({ description: 'Created at timestamp' })
-  created_at: Date;
+  createdAt: Date | string;
 
   @ApiProperty({ description: 'Updated at timestamp' })
-  updated_at: Date;
+  updatedAt: Date | string;
 
   @ApiProperty({ description: 'Published at timestamp', required: false })
-  published_at?: Date;
+  publishedAt?: Date | string;
 
   @ApiProperty({ description: 'Created by user ID (UUID)', required: false })
-  created_by?: string;
+  createdBy?: string;
 }
 

@@ -35,7 +35,7 @@ export class BuildingsController {
   constructor(private readonly buildingsService: BuildingsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get paginated list of buildings' })
+  @ApiOperation({ summary: 'Get paginated list of buildings (public)' })
   @ApiResponse({
     status: 200,
     description: 'List of buildings retrieved successfully',
@@ -47,21 +47,64 @@ export class BuildingsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get building by ID' })
+  @ApiOperation({ summary: 'Get building by ID (public)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
+  @ApiQuery({ name: 'currency', enum: ['AMD', 'USD'], required: false, description: 'Currency for price conversion' })
   @ApiResponse({
     status: 200,
     description: 'Building retrieved successfully',
     type: BuildingResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Building not found' })
-  async findOne(@Param('id') id: string): Promise<BuildingResponseDto> {
-    return this.buildingsService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @Query('currency') currency?: string,
+  ): Promise<{ data: BuildingResponseDto }> {
+    const building = await this.buildingsService.findOne(id, currency || 'AMD');
+    return { data: building };
+  }
+}
+
+@ApiTags('admin-buildings')
+@Controller('v1/admin/buildings')
+@UseGuards(AdminGuard)
+export class AdminBuildingsController {
+  constructor(private readonly buildingsService: BuildingsService) {}
+
+  @Get()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get paginated list of buildings (admin)' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of buildings retrieved successfully',
+    type: PaginatedBuildingsResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
+  async findAll(@Query() query: ListBuildingsQueryDto): Promise<PaginatedBuildingsResponseDto> {
+    // Admin can see all statuses
+    return this.buildingsService.findAll(query, true);
+  }
+
+  @Get(':id')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get building by ID (admin)' })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Building retrieved successfully',
+    type: BuildingResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
+  @ApiResponse({ status: 404, description: 'Building not found' })
+  async findOne(@Param('id') id: string): Promise<{ data: BuildingResponseDto }> {
+    const building = await this.buildingsService.findOne(id);
+    return { data: building };
   }
 
   @Post()
-  @UseGuards(AdminGuard)
   @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new building (admin only)' })
   @ApiResponse({
     status: 201,
@@ -70,12 +113,12 @@ export class BuildingsController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
-  async create(@Body() createDto: CreateBuildingDto): Promise<BuildingResponseDto> {
-    return this.buildingsService.create(createDto);
+  async create(@Body() createDto: CreateBuildingDto): Promise<{ data: BuildingResponseDto }> {
+    const building = await this.buildingsService.create(createDto);
+    return { data: building };
   }
 
   @Put(':id')
-  @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a building (admin only)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
@@ -90,20 +133,20 @@ export class BuildingsController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateBuildingDto,
-  ): Promise<BuildingResponseDto> {
-    return this.buildingsService.update(id, updateDto);
+  ): Promise<{ data: BuildingResponseDto }> {
+    const building = await this.buildingsService.update(id, updateDto);
+    return { data: building };
   }
 
   @Delete(':id')
-  @UseGuards(AdminGuard)
   @ApiBearerAuth()
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete a building (admin only)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
-  @ApiResponse({ status: 204, description: 'Building deleted successfully' })
+  @ApiResponse({ status: 200, description: 'Building deleted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
-  async remove(@Param('id') id: string): Promise<void> {
+  async remove(@Param('id') id: string): Promise<{ data: { id: string; status: string; deletedAt: string } }> {
     return this.buildingsService.remove(id);
   }
 }
