@@ -43,7 +43,10 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
       const startIso = start.toISOString();
       const endIso = end.toISOString();
       
-      const partitionName = `analytics.events_${year}_${String(month + 1).padStart(2, '0')}`;
+      // Derive partition name suffix from the computed start date to handle year rollover correctly
+      const partYear = start.getUTCFullYear();
+      const partMonth = start.getUTCMonth() + 1;
+      const partitionName = `analytics.events_${partYear}_${String(partMonth).padStart(2, '0')}`;
       
       await queryRunner.query(`
         CREATE TABLE IF NOT EXISTS ${partitionName} PARTITION OF analytics.events
@@ -52,23 +55,23 @@ export class InitialAnalyticsSchema1735689603000 implements MigrationInterface {
 
       // Create indexes on partition
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_type_entity_${year}_${String(month + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_type_entity_${partYear}_${String(partMonth).padStart(2, '0')}
         ON ${partitionName}(event_type, entity_type, entity_id);
       `);
 
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_created_at_${year}_${String(month + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_created_at_${partYear}_${String(partMonth).padStart(2, '0')}
         ON ${partitionName}(created_at DESC);
       `);
 
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_session_${year}_${String(month + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_session_${partYear}_${String(partMonth).padStart(2, '0')}
         ON ${partitionName}(session_id) WHERE session_id IS NOT NULL;
       `);
 
       // Non-unique index on id for faster lookups by id
       await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_id_${year}_${String(month + 1).padStart(2, '0')}
+        CREATE INDEX IF NOT EXISTS idx_events_id_${partYear}_${String(partMonth).padStart(2, '0')}
         ON ${partitionName}(id);
       `);
     }

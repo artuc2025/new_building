@@ -1,6 +1,7 @@
-import { Entity, Column, PrimaryColumn, Index } from 'typeorm';
+import { Entity, Column, PrimaryColumn, Index, Generated } from 'typeorm';
 
 @Entity('events', { schema: 'analytics' })
+// Index decorators below are documentary only - actual indexes are created in migrations
 @Index(['event_type', 'entity_type', 'entity_id'])
 @Index(['created_at'])
 @Index(['session_id'], { where: 'session_id IS NOT NULL' })
@@ -9,10 +10,11 @@ export class Event {
   // Composite primary key: (created_at, id)
   // Both columns have database defaults (gen_random_uuid() and NOW())
   // When creating entities, do not set these fields - the database will generate them
-  @PrimaryColumn({ type: 'uuid' })
+  @PrimaryColumn({ type: 'uuid', default: () => 'gen_random_uuid()' })
+  @Generated('uuid')
   id!: string;
 
-  @PrimaryColumn({ type: 'timestamptz' })
+  @PrimaryColumn({ type: 'timestamptz', default: () => 'NOW()' })
   created_at!: Date;
 
   @Column({ type: 'varchar', length: 50, nullable: false })
