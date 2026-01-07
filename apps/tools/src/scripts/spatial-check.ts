@@ -3,7 +3,8 @@ import { config } from 'dotenv';
 
 config();
 
-const pool = createPool();
+// Use listings DB URL for spatial checks (queries listings.buildings, listings.regions)
+const pool = createPool('listings');
 
 async function spatialCheck() {
   const client = await pool.connect();

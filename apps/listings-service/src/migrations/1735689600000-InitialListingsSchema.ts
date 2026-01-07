@@ -85,10 +85,9 @@ export class InitialListingsSchema1735689600000 implements MigrationInterface {
         published_at TIMESTAMPTZ,
         created_by UUID,
         search_vector TSVECTOR GENERATED ALWAYS AS (
-          setweight(to_tsvector('armenian', COALESCE(title->>'am', '')), 'A') ||
-          setweight(to_tsvector('russian', COALESCE(title->>'ru', '')), 'A') ||
-          setweight(to_tsvector('english', COALESCE(title->>'en', '')), 'B') ||
-          setweight(to_tsvector('simple', COALESCE(address->>'am', '')), 'C')
+          to_tsvector('simple', COALESCE(title->>'am', '') || ' ' || COALESCE(description->>'am', '')) ||
+          to_tsvector('simple', COALESCE(title->>'ru', '') || ' ' || COALESCE(description->>'ru', '')) ||
+          to_tsvector('simple', COALESCE(title->>'en', '') || ' ' || COALESCE(description->>'en', ''))
         ) STORED
       );
     `);

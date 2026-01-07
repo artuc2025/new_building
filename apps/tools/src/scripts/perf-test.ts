@@ -3,7 +3,8 @@ import { config } from 'dotenv';
 
 config();
 
-const pool = createPool();
+// Use listings DB URL for perf tests (queries listings.buildings, listings.regions)
+const pool = createPool('listings');
 
 async function perfTest() {
   const client = await pool.connect();

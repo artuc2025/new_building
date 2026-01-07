@@ -15,28 +15,28 @@
     "migration:generate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx src/migrations/generate.ts --name {args.name}",
+        "command": "tsx src/migration-cli/generate.ts --name {args.name}",
         "cwd": "{projectRoot}"
       }
     },
     "migration:run": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx src/migrations/run.ts",
+        "command": "tsx src/migration-cli/run.ts",
         "cwd": "{projectRoot}"
       }
     },
     "migration:revert": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx src/migrations/revert.ts",
+        "command": "tsx src/migration-cli/revert.ts",
         "cwd": "{projectRoot}"
       }
     },
     "migrate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx src/migrations/run.ts",
+        "command": "tsx src/migration-cli/run.ts",
         "cwd": "{projectRoot}"
       }
     }

@@ -4,25 +4,44 @@ import { Pool } from 'pg';
 
 config();
 
-// Shared database URL
+type ServiceName = 'listings' | 'content' | 'media' | 'analytics';
+
+/**
+ * Get database URL for a specific service.
+ * Supports per-service DB URLs (DATABASE_URL_LISTINGS, etc.) with fallback to shared DATABASE_URL.
+ */
+export const getDbUrl = (serviceName: ServiceName): string => {
+  // Try per-service URL first
+  const serviceUrl = process.env[`DATABASE_URL_${serviceName.toUpperCase()}`];
+  if (serviceUrl) {
+    return serviceUrl;
+  }
+
+  // Fallback to shared DATABASE_URL
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+
+  // Default fallback
+  return 'postgresql://postgres:postgres@localhost:5432/new_building_portal';
+};
+
+// Legacy function for backward compatibility (uses listings DB URL)
 const getDatabaseUrl = (): string => {
-  return (
-    process.env.DATABASE_URL ||
-    process.env.DATABASE_URL_LISTINGS ||
-    'postgresql://postgres:postgres@localhost:5432/new_building_portal'
-  );
+  return getDbUrl('listings');
 };
 
 // Create a raw PostgreSQL connection pool for direct SQL queries
-export const createPool = (): Pool => {
-  const url = getDatabaseUrl();
+// Uses listings DB URL by default (for backward compatibility)
+export const createPool = (serviceName?: ServiceName): Pool => {
+  const url = serviceName ? getDbUrl(serviceName) : getDatabaseUrl();
   return new Pool({ connectionString: url });
 };
 
 // Data sources for each service (for TypeORM entity operations)
 export const listingsDataSource = new DataSource({
   type: 'postgres',
-  url: getDatabaseUrl(),
+  url: getDbUrl('listings'),
   schema: 'listings',
   synchronize: false,
   logging: false,
@@ -31,7 +50,7 @@ export const listingsDataSource = new DataSource({
 
 export const mediaDataSource = new DataSource({
   type: 'postgres',
-  url: getDatabaseUrl(),
+  url: getDbUrl('media'),
   schema: 'media',
   synchronize: false,
   logging: false,
@@ -40,7 +59,7 @@ export const mediaDataSource = new DataSource({
 
 export const contentDataSource = new DataSource({
   type: 'postgres',
-  url: getDatabaseUrl(),
+  url: getDbUrl('content'),
   schema: 'content',
   synchronize: false,
   logging: false,
@@ -49,7 +68,7 @@ export const contentDataSource = new DataSource({
 
 export const analyticsDataSource = new DataSource({
   type: 'postgres',
-  url: getDatabaseUrl(),
+  url: getDbUrl('analytics'),
   schema: 'analytics',
   synchronize: false,
   logging: false,

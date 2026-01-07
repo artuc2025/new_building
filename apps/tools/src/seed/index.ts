@@ -1,6 +1,10 @@
-import { createPool } from '../db/data-source';
+import { createPool, getDbUrl } from '../db/data-source';
 
-const pool = createPool();
+// Create pools for each service
+const listingsPool = createPool('listings');
+const contentPool = createPool('content');
+const mediaPool = createPool('media');
+const analyticsPool = createPool('analytics');
 
 // Helper to generate JSONB for multi-language fields
 const ml = (am: string, ru: string, en: string) => ({ am, ru, en });
@@ -13,25 +17,78 @@ const polygon = (minLng: number, minLat: number, maxLng: number, maxLat: number)
   `POLYGON((${minLng} ${minLat}, ${maxLng} ${minLat}, ${maxLng} ${maxLat}, ${minLng} ${maxLat}, ${minLng} ${minLat}))`;
 
 async function seed() {
-  const client = await pool.connect();
+  console.log('🌱 Starting database seed...');
+  console.log(`  Listings DB: ${getDbUrl('listings')}`);
+  console.log(`  Content DB: ${getDbUrl('content')}`);
+  console.log(`  Media DB: ${getDbUrl('media')}`);
+  console.log(`  Analytics DB: ${getDbUrl('analytics')}\n`);
+
+  // Seed each service in its own transaction
+  // Note: We seed media first because listings references media IDs
+  const mediaAssetIds = await seedMedia();
+  const buildingIds = await seedListings(mediaAssetIds);
+  await seedContent();
+  await seedAnalytics(buildingIds);
+
+  console.log('\n✅ All seed operations completed successfully!');
+  
+  // Cleanup pools
+  await listingsPool.end();
+  await contentPool.end();
+  await mediaPool.end();
+  await analyticsPool.end();
+}
+
+async function seedMedia(): Promise<string[]> {
+  const client = await mediaPool.connect();
 
   try {
-    console.log('🌱 Starting database seed...');
+    await client.query('BEGIN');
+    console.log('📦 Seeding media service...');
+
+    // Clear existing data
+    await client.query('DELETE FROM media.processing_jobs').catch(() => {});
+    await client.query('DELETE FROM media.assets').catch(() => {});
+
+    // Seed Media Assets (minimal stubs)
+    console.log('Seeding media assets...');
+    const mediaAssets: string[] = [];
+    for (let i = 0; i < 15; i++) {
+      const result = await client.query(
+        `INSERT INTO media.assets (id, original_filename, mime_type, file_size, bucket, object_key, processing_status)
+         VALUES (gen_random_uuid(), $1, 'image/jpeg', 102400, 'buildings', $2, 'completed')
+         RETURNING id`,
+        [`building-${i + 1}.jpg`, `buildings/building-${i + 1}.jpg`]
+      );
+      mediaAssets.push(result.rows[0].id);
+    }
+    console.log(`✓ Created ${mediaAssets.length} media assets`);
+
+    await client.query('COMMIT');
+    return mediaAssets;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Media seed failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function seedListings(mediaAssetIds: string[]): Promise<string[]> {
+  const client = await listingsPool.connect();
+
+  try {
+    await client.query('BEGIN');
+    console.log('📦 Seeding listings service...');
 
     // Clear existing data (idempotent seed - wipe and reseed)
-    console.log('Clearing existing seed data...');
-    await client.query('DELETE FROM listings.building_images');
-    await client.query('DELETE FROM listings.pricing_snapshots');
-    await client.query('DELETE FROM listings.building_submissions');
-    await client.query('DELETE FROM listings.buildings');
-    await client.query('DELETE FROM listings.regions');
-    await client.query('DELETE FROM listings.developers');
-    await client.query('DELETE FROM media.processing_jobs');
-    await client.query('DELETE FROM media.assets');
-    await client.query('DELETE FROM content.seo_metadata');
-    await client.query('DELETE FROM content.articles');
-    await client.query('DELETE FROM analytics.aggregates');
-    // Note: analytics.events is partitioned, so we'll just insert a few test events
+    await client.query('DELETE FROM listings.building_images').catch(() => {});
+    await client.query('DELETE FROM listings.pricing_snapshots').catch(() => {});
+    await client.query('DELETE FROM listings.building_submissions').catch(() => {});
+    await client.query('DELETE FROM listings.buildings').catch(() => {});
+    await client.query('DELETE FROM listings.regions').catch(() => {});
+    await client.query('DELETE FROM listings.developers').catch(() => {});
 
     // 1. Seed Developers (3-5 developers)
     console.log('Seeding developers...');
@@ -126,21 +183,7 @@ async function seed() {
 
     console.log(`✓ Created 1 city, ${districts.length} districts, 1 neighborhood`);
 
-    // 3. Seed Media Assets (minimal stubs)
-    console.log('Seeding media assets...');
-    const mediaAssets: string[] = [];
-    for (let i = 0; i < 15; i++) {
-      const result = await client.query(
-        `INSERT INTO media.assets (id, original_filename, mime_type, file_size, bucket, object_key, processing_status)
-         VALUES (gen_random_uuid(), $1, 'image/jpeg', 102400, 'buildings', $2, 'completed')
-         RETURNING id`,
-        [`building-${i + 1}.jpg`, `buildings/building-${i + 1}.jpg`]
-      );
-      mediaAssets.push(result.rows[0].id);
-    }
-    console.log(`✓ Created ${mediaAssets.length} media assets`);
-
-    // 4. Seed Buildings (10-20 buildings)
+    // 3. Seed Buildings (10-20 buildings)
     console.log('Seeding buildings...');
     const buildings: string[] = [];
     const buildingLocations = [
@@ -222,18 +265,40 @@ async function seed() {
 
       // Connect media assets to buildings (2-3 images per building)
       const imageCount = 2 + Math.floor(Math.random() * 2);
-      for (let j = 0; j < imageCount && i * imageCount + j < mediaAssets.length; j++) {
+      for (let j = 0; j < imageCount && i * imageCount + j < mediaAssetIds.length; j++) {
         await client.query(
           `INSERT INTO listings.building_images (building_id, media_id, display_order, is_primary)
            VALUES ($1, $2, $3, $4)
            ON CONFLICT DO NOTHING`,
-          [buildingId, mediaAssets[i * imageCount + j] || mediaAssets[j], j, j === 0]
+          [buildingId, mediaAssetIds[i * imageCount + j] || mediaAssetIds[j], j, j === 0]
         );
       }
     }
     console.log(`✓ Created ${buildings.length} buildings with pricing snapshots and images`);
 
-    // 5. Seed Articles (5-10 blog articles)
+    await client.query('COMMIT');
+    return buildings;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Listings seed failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function seedContent(): Promise<void> {
+  const client = await contentPool.connect();
+
+  try {
+    await client.query('BEGIN');
+    console.log('📦 Seeding content service...');
+
+    // Clear existing data
+    await client.query('DELETE FROM content.seo_metadata').catch(() => {});
+    await client.query('DELETE FROM content.articles').catch(() => {});
+
+    // Seed Articles (5-10 blog articles)
     console.log('Seeding articles...');
     const articles: string[] = [];
     for (let i = 0; i < 8; i++) {
@@ -257,18 +322,39 @@ async function seed() {
     }
     console.log(`✓ Created ${articles.length} articles`);
 
-    // 6. Seed Analytics (minimal - a few events and aggregates)
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Content seed failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function seedAnalytics(buildingIds: string[]): Promise<void> {
+  const client = await analyticsPool.connect();
+
+  try {
+    await client.query('BEGIN');
+    console.log('📦 Seeding analytics service...');
+
+    // Clear existing data
+    await client.query('DELETE FROM analytics.aggregates').catch(() => {});
+    // Note: analytics.events is partitioned, so we'll just insert a few test events
+
+    // Seed Analytics (minimal - a few events and aggregates)
     console.log('Seeding analytics...');
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 10 && i < buildingIds.length; i++) {
       await client.query(
         `INSERT INTO analytics.events (id, event_type, entity_type, entity_id, session_id, metadata, created_at)
          VALUES (gen_random_uuid(), 'view', 'building', $1, $2, $3::jsonb, NOW())`,
-        [buildings[i % buildings.length], `session-${i}`, JSON.stringify({ source: 'web' })]
+        [buildingIds[i], `session-${i}`, JSON.stringify({ source: 'web' })]
       );
     }
 
     // Add a few aggregates
-    for (const buildingId of buildings.slice(0, 5)) {
+    for (const buildingId of buildingIds.slice(0, 5)) {
       await client.query(
         `INSERT INTO analytics.aggregates (id, metric_name, entity_type, entity_id, period_type, period_start, value, created_at, updated_at)
          VALUES (gen_random_uuid(), 'view_count', 'building', $1, 'daily', CURRENT_DATE, $2, NOW(), NOW())
@@ -278,13 +364,13 @@ async function seed() {
     }
     console.log('✓ Created analytics events and aggregates');
 
-    console.log('\n✅ Seed completed successfully!');
+    await client.query('COMMIT');
   } catch (error) {
-    console.error('❌ Seed failed:', error);
+    await client.query('ROLLBACK');
+    console.error('❌ Analytics seed failed:', error);
     throw error;
   } finally {
     client.release();
-    await pool.end();
   }
 }
 
@@ -293,4 +379,3 @@ seed().catch((error) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });
-
