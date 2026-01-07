@@ -57,7 +57,9 @@ async function spatialCheck() {
     );
     console.log(`   ✓ Found ${pipResult.rows.length} buildings inside region boundaries`);
     if (pipResult.rows.length > 0) {
-      console.log(`   Sample: Building ${pipResult.rows[0].id.substring(0, 8)} in region ${JSON.parse(pipResult.rows[0].region_name).en || 'N/A'}`);
+      const regionName = pipResult.rows[0].region_name;
+      const regionNameObj = typeof regionName === 'string' ? JSON.parse(regionName) : regionName;
+      console.log(`   Sample: Building ${pipResult.rows[0].id.substring(0, 8)} in region ${regionNameObj?.en || 'N/A'}`);
     }
     console.log('');
 

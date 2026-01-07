@@ -56,7 +56,7 @@ async function perfTest() {
           const regionId = regionIds[Math.floor(Math.random() * regionIds.length)];
 
           values.push(
-            `($${paramIndex}::jsonb, $${paramIndex + 1}::jsonb, $${paramIndex + 2}::jsonb, ST_GeogFromText($${paramIndex + 3}), $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, $${paramIndex + 12}, $${paramIndex + 13}, $${paramIndex + 14}, $${paramIndex + 15}, NOW(), NOW(), $${paramIndex + 16})`
+            `($${paramIndex}::jsonb, $${paramIndex + 1}::jsonb, $${paramIndex + 2}::jsonb, ST_GeogFromText($${paramIndex + 3}), $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, $${paramIndex + 12}, $${paramIndex + 13}, $${paramIndex + 14}, $${paramIndex + 15}, $${paramIndex + 16}, $${paramIndex + 17})`
           );
 
           params.push(
@@ -80,14 +80,14 @@ async function perfTest() {
             status === 'published' ? new Date() : null
           );
 
-          paramIndex += 17;
+          paramIndex += 18;
         }
 
         await client.query(
           `INSERT INTO listings.buildings (
             title, description, address, location, city, floors, total_units, commissioning_date,
             construction_status, price_per_m2_min, price_per_m2_max, area_min, area_max, currency,
-            developer_id, region_id, status, created_at, updated_at, published_at
+            developer_id, region_id, status, published_at
           ) VALUES ${values.join(', ')}`,
           params
         );
