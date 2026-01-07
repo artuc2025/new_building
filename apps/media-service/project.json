@@ -1,0 +1,46 @@
+{
+  "name": "media-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/media-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter @new-building-portal/media-service build",
+        "cwd": "{projectRoot}"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "migration:generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/migrations/generate.ts --name {args.name}",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "migration:run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/migrations/run.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "migration:revert": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/migrations/revert.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/migrations/run.ts",
+        "cwd": "{projectRoot}"
+      }
+    }
+  },
+  "tags": []
+}
+
