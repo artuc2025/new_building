@@ -20,6 +20,21 @@ const REQUIRED_PER_SERVICE_KEYS = [
   'DATABASE_URL_ANALYTICS',
 ] as const;
 
+const SERVICE_NAMES = [
+  'listings',
+  'content',
+  'media',
+  'analytics',
+] as const satisfies readonly ('listings' | 'content' | 'media' | 'analytics')[];
+
+/**
+ * Helper to ensure all seed logs are multiline and consistently prefixed.
+ * One log line = one console.log call.
+ */
+function logSeed(line: string): void {
+  console.log(`[seed] ${line}`);
+}
+
 /**
  * Detect DB configuration mode with strict validation.
  * Returns the mode and environment status.
@@ -62,24 +77,63 @@ function detectDbMode(): { mode: DbMode; envStatus: Record<string, boolean> } {
  */
 function printDbMode(mode: DbMode, envStatus: Record<string, boolean>) {
   if (mode === 'SHARED') {
-    console.log('[seed] DB mode: SHARED');
-    console.log(`[seed] DATABASE_URL: ${envStatus.DATABASE_URL ? '(set)' : '(not set)'}`);
-    console.log('');
+    logSeed('DB mode: SHARED');
+    logSeed(`DATABASE_URL: ${envStatus.DATABASE_URL ? '(set)' : '(not set)'}`);
+    logSeed('');
     return;
   }
 
   if (mode === 'PER_SERVICE') {
-    console.log('[seed] DB mode: PER_SERVICE');
+    logSeed('DB mode: PER_SERVICE');
     for (const key of REQUIRED_PER_SERVICE_KEYS) {
-      console.log(`[seed] ${key}: ${envStatus[key] ? '(set)' : '(not set)'}`);
+      logSeed(`${key}: ${envStatus[key] ? '(set)' : '(not set)'}`);
     }
-    console.log('');
+    logSeed('');
     return;
   }
 
   // MIXED mode - should not reach here if validation works correctly
-  console.log('[seed] DB mode: MIXED');
-  console.log('');
+  logSeed('DB mode: MIXED');
+  logSeed('');
+}
+
+/**
+ * Get effective DB selection for a service (which env key will be used).
+ * Returns the env key name and whether it's set.
+ */
+function getEffectiveDbSelection(serviceName: 'listings' | 'content' | 'media' | 'analytics'): {
+  envKey: string;
+  isSet: boolean;
+} {
+  const serviceKey = `DATABASE_URL_${serviceName.toUpperCase()}`;
+  const serviceKeySet = !!process.env[serviceKey];
+  const fallbackSet = !!process.env.DATABASE_URL;
+
+  if (serviceKeySet) {
+    return { envKey: serviceKey, isSet: true };
+  }
+
+  if (fallbackSet) {
+    return { envKey: 'DATABASE_URL', isSet: true };
+  }
+
+  return { envKey: 'DATABASE_URL', isSet: false };
+}
+
+/**
+ * Print effective DB selection summary for mixed mode (when SEED_ALLOW_MIXED=1).
+ * Shows which env key each service will use and its status.
+ */
+function printEffectiveDbSelection(): void {
+  logSeed('Effective DB selection (mixed mode):');
+  for (const serviceName of SERVICE_NAMES) {
+    const { envKey, isSet } = getEffectiveDbSelection(serviceName);
+    const keyLabel = envKey.startsWith('DATABASE_URL_') ? envKey : `${envKey} fallback`;
+    const status = isSet ? '(set)' : '(not set)';
+    const missingNote = !isSet ? ' -> MISSING (will fail on connect)' : '';
+    logSeed(`  - ${serviceName}: ${keyLabel} ${status}${missingNote}`);
+  }
+  logSeed('');
 }
 
 /**
@@ -93,23 +147,24 @@ function validateDbMode(): DbMode {
     const allowMixed = process.env.SEED_ALLOW_MIXED === '1';
     
     if (allowMixed) {
-      console.log('[seed] WARNING: SEED_ALLOW_MIXED=1 enabled — mixed DB config may cause partial seeding');
-      console.log('');
+      logSeed('WARNING: SEED_ALLOW_MIXED=1 enabled — mixed DB config may cause partial seeding');
+      logSeed('');
+      printEffectiveDbSelection();
       return mode;
     }
 
     // Fail-fast with clear actionable message
-    console.log('[seed] DB mode: INVALID (mixed configuration)');
-    console.log('[seed] Set EITHER:');
-    console.log('[seed]   - DATABASE_URL (shared mode) and unset all DATABASE_URL_*,');
-    console.log('[seed]   OR');
-    console.log('[seed]   - set ALL of: DATABASE_URL_LISTINGS, DATABASE_URL_CONTENT, DATABASE_URL_MEDIA, DATABASE_URL_ANALYTICS (per-service mode)');
-    console.log('[seed] Current env status:');
-    console.log(`[seed]   - DATABASE_URL: ${envStatus.DATABASE_URL ? '(set)' : '(not set)'}`);
+    logSeed('DB mode: INVALID (mixed configuration)');
+    logSeed('Set EITHER:');
+    logSeed('  - DATABASE_URL (shared mode) and unset all DATABASE_URL_*,');
+    logSeed('  OR');
+    logSeed('  - set ALL of: DATABASE_URL_LISTINGS, DATABASE_URL_CONTENT, DATABASE_URL_MEDIA, DATABASE_URL_ANALYTICS (per-service mode)');
+    logSeed('Current env status:');
+    logSeed(`  - DATABASE_URL: ${envStatus.DATABASE_URL ? '(set)' : '(not set)'}`);
     for (const key of REQUIRED_PER_SERVICE_KEYS) {
-      console.log(`[seed]   - ${key}: ${envStatus[key] ? '(set)' : '(not set)'}`);
+      logSeed(`  - ${key}: ${envStatus[key] ? '(set)' : '(not set)'}`);
     }
-    console.log('');
+    logSeed('');
     process.exit(1);
   }
 
