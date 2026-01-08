@@ -96,11 +96,11 @@ export class PublicListBuildingsQueryDto {
 
   @ApiPropertyOptional({
     description: 'Sort option',
-    enum: ['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc'],
+    enum: ['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc', 'floors_asc', 'floors_desc'],
     default: 'date_desc',
   })
   @IsOptional()
-  @IsEnum(['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc'])
+  @IsEnum(['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc', 'floors_asc', 'floors_desc'])
   sort?: string = 'date_desc';
 
   @ApiPropertyOptional({

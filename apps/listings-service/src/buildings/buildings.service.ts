@@ -18,6 +18,8 @@ const SORT_MAP: Record<string, { column: string; direction: 'ASC' | 'DESC' }> = 
   date_asc: { column: 'updated_at', direction: 'ASC' },
   area_asc: { column: 'area_min', direction: 'ASC' },
   area_desc: { column: 'area_min', direction: 'DESC' },
+  floors_asc: { column: 'floors', direction: 'ASC' },
+  floors_desc: { column: 'floors', direction: 'DESC' },
 };
 
 @Injectable()
@@ -68,6 +70,8 @@ export class BuildingsService {
     const buildings = await qb.getMany();
 
     const totalPages = Math.ceil(total / limit);
+    const hasPrev = page > 1;
+    const hasNext = totalPages > 0 && page < totalPages;
 
     return {
       data: buildings.map((b) => this.toResponseDto(b, currency)),
@@ -76,6 +80,8 @@ export class BuildingsService {
         limit,
         total,
         totalPages,
+        hasNext,
+        hasPrev,
       },
       meta: {
         currency,
