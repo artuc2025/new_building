@@ -15,7 +15,7 @@
  */
 
 import { readFileSync, writeFileSync, statSync, existsSync, mkdirSync } from 'fs';
-import { resolve, relative, join, basename, dirname as pathDirname } from 'path';
+import { resolve, relative, join, basename, dirname as pathDirname, isAbsolute } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -125,12 +125,12 @@ function bundleFiles(config) {
   };
 
   for (const filePath of paths) {
-    const resolvedPath = resolve(filePath);
+    const resolvedPath = resolve(config.root, filePath);
     const relativePath = relative(config.root, resolvedPath);
     const fileName = basename(resolvedPath);
 
     // Check if path is inside root
-    if (relativePath.startsWith('..') || relativePath === filePath) {
+    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
       skipped.push({
         path: filePath,
         reason: 'outside root directory'

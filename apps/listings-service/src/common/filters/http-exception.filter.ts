@@ -31,9 +31,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (exception instanceof HttpException) {
         return response.status(exception.getStatus()).json(exception.getResponse());
       }
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      // For non-HttpException on health endpoints, return 503 (not 500) with minimal body
+      return response.status(HttpStatus.SERVICE_UNAVAILABLE).json({
         status: 'error',
-        message: 'Internal server error',
+        message: 'Service unavailable',
       });
     }
 

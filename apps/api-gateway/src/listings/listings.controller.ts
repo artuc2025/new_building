@@ -299,10 +299,11 @@ export class AdminListingsController {
   ) {}
 
   private getListingsServiceUrl(): string {
-    return (
-      this.configService.get<string>('LISTINGS_SERVICE_URL') ||
-      'http://localhost:3001'
-    );
+    const url = this.configService.get<string>('LISTINGS_SERVICE_URL');
+    if (!url) {
+      throw new Error('LISTINGS_SERVICE_URL environment variable is required');
+    }
+    return url;
   }
 
   private getTimeout(): number {
