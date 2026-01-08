@@ -52,7 +52,8 @@
       "options": {
         "command": "pnpm --filter @new-building-portal/listings-service test",
         "cwd": "{projectRoot}"
-      }
+      },
+      "dependsOn": ["openapi:generate"]
     },
     "openapi:generate": {
       "executor": "nx:run-commands",

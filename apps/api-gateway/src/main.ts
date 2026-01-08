@@ -48,9 +48,8 @@ async function bootstrap() {
       'admin-key',
     )
     .build();
-  const document = SwaggerModule.createDocument(app, config, {
-    extraModels: [],
-  });
+  // extraModels removed - models are discovered via @ApiExtraModels decorators on controllers
+  const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
   // Store document in service for /api-docs-json endpoint

@@ -14,7 +14,7 @@ import {
   HttpException,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader, ApiOkResponse, ApiCreatedResponse, ApiExtraModels } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader, ApiOkResponse, ApiCreatedResponse, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
 import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto } from '@new-building-portal/contracts';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';

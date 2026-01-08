@@ -1,7 +1,8 @@
+// Ensure reflect-metadata is loaded first, before any other imports
 import 'reflect-metadata';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { Test } from '@nestjs/testing';
+import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
@@ -17,13 +18,10 @@ async function generateOpenAPI() {
     // Disable logging to reduce noise
     process.env.NODE_ENV = 'production';
     
-    // Create testing module to properly initialize NestJS context
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-    
-    // Create NestJS app from testing module
-    const app = moduleRef.createNestApplication();
+    // Create NestJS app directly (similar to main.ts)
+    const app = await NestFactory.create(AppModule, {
+      logger: false, // Disable logging during generation
+    });
     
     // Initialize app
     let initSucceeded = false;
@@ -77,10 +75,10 @@ async function generateOpenAPI() {
       .build();
     
     // Create document with options to handle parameter metadata issues
+    // extraModels removed - models are discovered via @ApiExtraModels decorators on controllers
     const document = SwaggerModule.createDocument(app, config, {
       ignoreGlobalPrefix: false,
       deepScanRoutes: true,
-      extraModels: [],
     });
     
     // Write to openapi.json in service root

@@ -91,13 +91,12 @@ export class ListBuildingsQueryDto {
   commissioning_date_to?: string;
 
   @ApiPropertyOptional({
-    description: 'Status filter (public: published only; admin: draft, published, archived, all)',
+    description: 'Status filter (public: published only; admin: draft, published, archived, all). Defaults to "all" for admin, "published" for public.',
     enum: ['published', 'draft', 'archived', 'all'],
-    default: 'published',
   })
   @IsOptional()
   @IsEnum(['published', 'draft', 'archived', 'all'])
-  status?: string = 'published';
+  status?: string;
 
   @ApiPropertyOptional({
     description: 'Sort option',
