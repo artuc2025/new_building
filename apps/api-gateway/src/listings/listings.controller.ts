@@ -222,6 +222,25 @@ export class ListingsController {
     }
   }
 
+  private buildQueryString(query: Record<string, any>): string {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null) {
+        continue; // Skip undefined/null values
+      }
+      if (Array.isArray(value)) {
+        // Handle arrays by appending each value
+        for (const item of value) {
+          params.append(key, String(item));
+        }
+      } else {
+        // Handle numbers/booleans by converting to string
+        params.append(key, String(value));
+      }
+    }
+    return params.toString();
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get paginated list of buildings (public)' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
@@ -239,14 +258,14 @@ export class ListingsController {
   @ApiQuery({ name: 'commissioning_date_from', required: false, type: String, description: 'Commissioning date from (ISO 8601 date string)' })
   @ApiQuery({ name: 'commissioning_date_to', required: false, type: String, description: 'Commissioning date to (ISO 8601 date string)' })
   @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
-  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status filter (public endpoints only expose published buildings). Defaults to "published".', enum: ['published'], default: 'published' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status filter (public endpoints only expose published buildings). Defaults to "published".', enum: ['published'] })
   @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
     // Public endpoints: enforce published-only status
     // If status is provided, validate it's 'published', otherwise default to 'published'
-    const query = { ...req.query };
+    const query = { ...(req.query as Record<string, any>) };
     if (query.status && query.status !== 'published') {
       // Reject any non-published status for public endpoints
       throw new HttpException(
@@ -265,7 +284,7 @@ export class ListingsController {
     query.status = 'published';
     // Strip search parameter (not supported in Sprint 2)
     delete query.search;
-    const queryString = new URLSearchParams(query as Record<string, string>).toString();
+    const queryString = this.buildQueryString(query);
     const path = `/v1/buildings${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
   }
@@ -280,9 +299,9 @@ export class ListingsController {
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     // Public endpoints: strip status parameter to enforce published-only
-    const query = { ...req.query };
+    const query = { ...(req.query as Record<string, any>) };
     delete query.status;
-    const queryString = new URLSearchParams(query as Record<string, string>).toString();
+    const queryString = this.buildQueryString(query);
     const path = `/v1/buildings/${id}${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
   }

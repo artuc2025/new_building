@@ -27,7 +27,8 @@ describe('API Contract Tests (api-gateway)', () => {
 
   beforeAll(async () => {
     // Load OpenAPI spec from generated file
-    const specPath = join(__dirname, '../../openapi.json');
+    // Use process.cwd() because tests run with cwd = apps/api-gateway when using pnpm --filter
+    const specPath = join(process.cwd(), 'openapi.json');
     try {
       const specContent = readFileSync(specPath, 'utf-8');
       openApiSpec = await SwaggerParser.dereference(JSON.parse(specContent));
