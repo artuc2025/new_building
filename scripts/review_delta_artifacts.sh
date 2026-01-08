@@ -11,9 +11,36 @@
 
 set -euo pipefail
 
-# Accept BASE with priority: $1 > BASE env > npm_config_base > default "dev-copy"
-if [ $# -gt 0 ]; then
-  BASE="$1"
+# Parse arguments for --base= flag
+PARSED_BASE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --base=*)
+      PARSED_BASE="${1#--base=}"
+      shift
+      ;;
+    --base)
+      if [ $# -gt 1 ]; then
+        PARSED_BASE="$2"
+        shift 2
+      else
+        echo "Error: --base requires a value" >&2
+        exit 1
+      fi
+      ;;
+    *)
+      # If no --base flag found yet, treat as positional BASE argument
+      if [ -z "$PARSED_BASE" ]; then
+        PARSED_BASE="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Accept BASE with priority: parsed --base > BASE env > npm_config_base > default "dev-copy"
+if [ -n "$PARSED_BASE" ]; then
+  BASE="$PARSED_BASE"
 elif [ -n "${BASE:-}" ]; then
   BASE="$BASE"
 elif [ -n "${npm_config_base:-}" ]; then
