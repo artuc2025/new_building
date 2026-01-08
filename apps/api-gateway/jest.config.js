@@ -2,10 +2,9 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src', '<rootDir>/test'],
-  // Exclude integration tests from default test run
-  // Run them explicitly with: jest --testMatch='**/*.integration.spec.ts'
+  // Include both unit and integration tests in default test run
   testMatch: ['**/*.spec.ts'],
-  testPathIgnorePatterns: ['/node_modules/', '.*\\.integration\\.spec\\.ts$'],
+  testPathIgnorePatterns: ['/node_modules/'],
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.spec.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   transform: {

@@ -58,7 +58,7 @@ async function bootstrap() {
     .build();
   // extraModels removed - models are discovered via @ApiExtraModels decorators on controllers
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api-docs', app, document);
 
   // Store document in service for /api-docs-json endpoint
   const swaggerDocumentService = app.get(SwaggerDocument);
@@ -66,7 +66,7 @@ async function bootstrap() {
 
   await app.listen(port);
   console.log(`API Gateway is running on: http://localhost:${port}`);
-  console.log(`Swagger UI available at: http://localhost:${port}/api/docs`);
+  console.log(`Swagger UI available at: http://localhost:${port}/api-docs`);
   console.log(`Swagger JSON available at: http://localhost:${port}/api-docs-json`);
 }
 

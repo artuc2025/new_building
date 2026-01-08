@@ -18,9 +18,9 @@ import { DataSource } from 'typeorm';
 const SPRINT_2_ENDPOINTS = [
   { path: '/v1/buildings', method: 'GET' },
   { path: '/v1/buildings/{id}', method: 'GET' },
-  { path: '/v1/admin/buildings', method: 'POST' },
-  { path: '/v1/admin/buildings/{id}', method: 'PUT' },
-  { path: '/v1/admin/buildings/{id}', method: 'DELETE' },
+  { path: '/v1/buildings', method: 'POST' },
+  { path: '/v1/buildings/{id}', method: 'PUT' },
+  { path: '/v1/buildings/{id}', method: 'DELETE' },
 ];
 
 describe('API Contract Tests (listings-service)', () => {
@@ -221,7 +221,7 @@ describe('API Contract Tests (listings-service)', () => {
     });
   });
 
-  describe('POST /v1/admin/buildings', () => {
+  describe('POST /v1/buildings', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
 
     it('should return 401 when missing x-admin-key', async () => {
@@ -237,7 +237,7 @@ describe('API Contract Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .send(createDto)
         .expect(401);
 
@@ -260,13 +260,13 @@ describe('API Contract Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
 
       expect(response.body).toHaveProperty('data');
-      validateResponse(201, response.body, '/v1/admin/buildings', 'POST');
+      validateResponse(201, response.body, '/v1/buildings', 'POST');
     });
 
     it('should return 400 for validation error', async () => {
@@ -276,7 +276,7 @@ describe('API Contract Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(invalidDto)
         .expect(400);
@@ -286,7 +286,7 @@ describe('API Contract Tests (listings-service)', () => {
     });
   });
 
-  describe('PUT /v1/admin/buildings/:id', () => {
+  describe('PUT /v1/buildings/:id', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
 
     it('should return 401 when missing x-admin-key', async () => {
@@ -299,7 +299,7 @@ describe('API Contract Tests (listings-service)', () => {
       };
 
       await request(app.getHttpServer())
-        .put(`/v1/admin/buildings/${building.id}`)
+        .put(`/v1/buildings/${building.id}`)
         .send(updateDto)
         .expect(401);
     });
@@ -314,25 +314,25 @@ describe('API Contract Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .put(`/v1/admin/buildings/${building.id}`)
+        .put(`/v1/buildings/${building.id}`)
         .set('x-admin-key', adminKey)
         .send(updateDto)
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
-      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'PUT');
+      validateResponse(200, response.body, '/v1/buildings/{id}', 'PUT');
     });
 
     it('should return 400 for invalid UUID format', async () => {
       await request(app.getHttpServer())
-        .put('/v1/admin/buildings/invalid-uuid')
+        .put('/v1/buildings/invalid-uuid')
         .set('x-admin-key', adminKey)
         .send({ title: { en: 'Updated' } })
         .expect(400);
     });
   });
 
-  describe('DELETE /v1/admin/buildings/:id', () => {
+  describe('DELETE /v1/buildings/:id', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
 
     it('should return 401 when missing x-admin-key', async () => {
@@ -341,7 +341,7 @@ describe('API Contract Tests (listings-service)', () => {
       const building = await createTestBuilding(dataSource, developer.id, region.id);
 
       await request(app.getHttpServer())
-        .delete(`/v1/admin/buildings/${building.id}`)
+        .delete(`/v1/buildings/${building.id}`)
         .expect(401);
     });
 
@@ -351,17 +351,17 @@ describe('API Contract Tests (listings-service)', () => {
       const building = await createTestBuilding(dataSource, developer.id, region.id);
 
       const response = await request(app.getHttpServer())
-        .delete(`/v1/admin/buildings/${building.id}`)
+        .delete(`/v1/buildings/${building.id}`)
         .set('x-admin-key', adminKey)
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
-      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'DELETE');
+      validateResponse(200, response.body, '/v1/buildings/{id}', 'DELETE');
     });
 
     it('should return 400 for invalid UUID format', async () => {
       await request(app.getHttpServer())
-        .delete('/v1/admin/buildings/invalid-uuid')
+        .delete('/v1/buildings/invalid-uuid')
         .set('x-admin-key', adminKey)
         .expect(400);
     });

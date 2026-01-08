@@ -20,9 +20,9 @@ describe('API Contract Tests (api-gateway)', () => {
   const SPRINT_2_ENDPOINTS = [
     { path: '/api/v1/buildings', method: 'GET' },
     { path: '/api/v1/buildings/{id}', method: 'GET' },
-    { path: '/api/v1/admin/buildings', method: 'POST' },
-    { path: '/api/v1/admin/buildings/{id}', method: 'PUT' },
-    { path: '/api/v1/admin/buildings/{id}', method: 'DELETE' },
+    { path: '/api/v1/buildings', method: 'POST' },
+    { path: '/api/v1/buildings/{id}', method: 'PUT' },
+    { path: '/api/v1/buildings/{id}', method: 'DELETE' },
   ];
 
   beforeAll(async () => {
@@ -227,7 +227,7 @@ describe('API Contract Tests (api-gateway)', () => {
     });
   });
 
-  describe('POST /api/v1/admin/buildings', () => {
+  describe('POST /api/v1/buildings', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
 
     it('should return 401 when missing x-admin-key', async () => {
@@ -243,7 +243,7 @@ describe('API Contract Tests (api-gateway)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/api/v1/admin/buildings')
+        .post('/api/v1/buildings')
         .send(createDto)
         .expect(401);
 
@@ -265,7 +265,7 @@ describe('API Contract Tests (api-gateway)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/api/v1/admin/buildings')
+        .post('/api/v1/buildings')
         .set('x-admin-key', 'wrong-key')
         .send(createDto)
         .expect(401);
@@ -307,13 +307,13 @@ describe('API Contract Tests (api-gateway)', () => {
       jest.spyOn(httpService, 'request').mockReturnValue(of(mockResponse) as any);
 
       const response = await request(app.getHttpServer())
-        .post('/api/v1/admin/buildings')
+        .post('/api/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
 
       expect(response.body).toHaveProperty('data');
-      validateResponse(201, response.body, '/api/v1/admin/buildings', 'POST');
+      validateResponse(201, response.body, '/api/v1/buildings', 'POST');
     });
 
     it('should return 400 for validation error', async () => {
@@ -336,7 +336,7 @@ describe('API Contract Tests (api-gateway)', () => {
       jest.spyOn(httpService, 'request').mockReturnValue(of(mockErrorResponse) as any);
 
       const response = await request(app.getHttpServer())
-        .post('/api/v1/admin/buildings')
+        .post('/api/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(invalidDto)
         .expect(400);
@@ -346,7 +346,7 @@ describe('API Contract Tests (api-gateway)', () => {
     });
   });
 
-  describe('PUT /api/v1/admin/buildings/:id', () => {
+  describe('PUT /api/v1/buildings/:id', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
     const testId = '00000000-0000-0000-0000-000000000000';
 
@@ -356,7 +356,7 @@ describe('API Contract Tests (api-gateway)', () => {
       };
 
       await request(app.getHttpServer())
-        .put(`/api/v1/admin/buildings/${testId}`)
+        .put(`/api/v1/buildings/${testId}`)
         .send(updateDto)
         .expect(401);
     });
@@ -388,31 +388,31 @@ describe('API Contract Tests (api-gateway)', () => {
       jest.spyOn(httpService, 'request').mockReturnValue(of(mockResponse) as any);
 
       const response = await request(app.getHttpServer())
-        .put(`/api/v1/admin/buildings/${testId}`)
+        .put(`/api/v1/buildings/${testId}`)
         .set('x-admin-key', adminKey)
         .send(updateDto)
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
-      validateResponse(200, response.body, '/api/v1/admin/buildings/{id}', 'PUT');
+      validateResponse(200, response.body, '/api/v1/buildings/{id}', 'PUT');
     });
 
     it('should return 400 for invalid UUID format', async () => {
       await request(app.getHttpServer())
-        .put('/api/v1/admin/buildings/invalid-uuid')
+        .put('/api/v1/buildings/invalid-uuid')
         .set('x-admin-key', adminKey)
         .send({ title: { en: 'Updated' } })
         .expect(400);
     });
   });
 
-  describe('DELETE /api/v1/admin/buildings/:id', () => {
+  describe('DELETE /api/v1/buildings/:id', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
     const testId = '00000000-0000-0000-0000-000000000000';
 
     it('should return 401 when missing x-admin-key', async () => {
       await request(app.getHttpServer())
-        .delete(`/api/v1/admin/buildings/${testId}`)
+        .delete(`/api/v1/buildings/${testId}`)
         .expect(401);
     });
 
@@ -431,17 +431,17 @@ describe('API Contract Tests (api-gateway)', () => {
       jest.spyOn(httpService, 'request').mockReturnValue(of(mockResponse) as any);
 
       const response = await request(app.getHttpServer())
-        .delete(`/api/v1/admin/buildings/${testId}`)
+        .delete(`/api/v1/buildings/${testId}`)
         .set('x-admin-key', adminKey)
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
-      validateResponse(200, response.body, '/api/v1/admin/buildings/{id}', 'DELETE');
+      validateResponse(200, response.body, '/api/v1/buildings/{id}', 'DELETE');
     });
 
     it('should return 400 for invalid UUID format', async () => {
       await request(app.getHttpServer())
-        .delete('/api/v1/admin/buildings/invalid-uuid')
+        .delete('/api/v1/buildings/invalid-uuid')
         .set('x-admin-key', adminKey)
         .expect(400);
     });

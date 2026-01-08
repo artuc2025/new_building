@@ -162,7 +162,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
     });
   });
 
-  describe('POST /v1/admin/buildings', () => {
+  describe('POST /v1/buildings', () => {
     const adminKey = 'test-admin-key';
 
     beforeAll(() => {
@@ -191,7 +191,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
@@ -200,7 +200,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body.data).toHaveProperty('id');
       expect(response.body.data.title.en).toBe('New Building');
 
-      validateResponse(201, response.body, '/v1/admin/buildings', 'POST');
+      validateResponse(201, response.body, '/v1/buildings', 'POST');
     });
 
     it('should accept camelCase fields (addressLine1, addressLine2, postalCode)', async () => {
@@ -222,7 +222,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
@@ -252,7 +252,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
@@ -279,7 +279,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .send(createDto)
         .expect(401);
     });
@@ -300,14 +300,14 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       await request(app.getHttpServer())
-        .post('/v1/admin/buildings')
+        .post('/v1/buildings')
         .set('x-admin-key', 'wrong-key')
         .send(createDto)
         .expect(401);
     });
   });
 
-  describe('PUT /v1/admin/buildings/:id', () => {
+  describe('PUT /v1/buildings/:id', () => {
     const adminKey = 'test-admin-key';
 
     beforeAll(() => {
@@ -328,7 +328,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .put(`/v1/admin/buildings/${building.id}`)
+        .put(`/v1/buildings/${building.id}`)
         .set('x-admin-key', adminKey)
         .send(updateDto)
         .expect(200);
@@ -336,7 +336,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.title.en).toBe('Updated Building');
 
-      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'PUT');
+      validateResponse(200, response.body, '/v1/buildings/{id}', 'PUT');
     });
 
     it('should return 404 when building not found', async () => {
@@ -353,7 +353,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
     });
   });
 
-  describe('DELETE /v1/admin/buildings/:id', () => {
+  describe('DELETE /v1/buildings/:id', () => {
     const adminKey = 'test-admin-key';
 
     beforeAll(() => {
@@ -370,7 +370,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       const building = await createTestBuilding(dataSource, developer.id, region.id);
 
       const response = await request(app.getHttpServer())
-        .delete(`/v1/admin/buildings/${building.id}`)
+        .delete(`/v1/buildings/${building.id}`)
         .set('x-admin-key', adminKey)
         .expect(200);
 
@@ -379,14 +379,14 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body.data.status).toBe('archived');
       expect(response.body.data).toHaveProperty('deletedAt');
 
-      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'DELETE');
+      validateResponse(200, response.body, '/v1/buildings/{id}', 'DELETE');
     });
 
     it('should return 404 when building not found', async () => {
       const nonExistentId = '00000000-0000-0000-0000-000000000000';
 
       await request(app.getHttpServer())
-        .delete(`/v1/admin/buildings/${nonExistentId}`)
+        .delete(`/v1/buildings/${nonExistentId}`)
         .set('x-admin-key', adminKey)
         .expect(404);
     });

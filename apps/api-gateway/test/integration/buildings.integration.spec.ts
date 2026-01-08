@@ -219,7 +219,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
     });
   });
 
-  describe('POST /api/v1/admin/buildings', () => {
+  describe('POST /api/v1/buildings', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
 
     it('should proxy request and return created building (happy path)', async () => {
@@ -246,7 +246,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       mockHttpServiceRequest.mockReturnValue(of(mockResponse));
 
       const response = await request(gatewayApp.getHttpServer())
-        .post('/api/v1/admin/buildings')
+        .post('/api/v1/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
@@ -254,7 +254,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.title.en).toBe('New Building');
       expect(mockHttpServiceRequest).toHaveBeenCalled();
-      validateResponse(201, response.body, '/api/v1/admin/buildings', 'POST');
+      validateResponse(201, response.body, '/api/v1/buildings', 'POST');
     });
 
     it('should return 401 for missing admin key', async () => {
@@ -268,7 +268,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       };
 
       await request(gatewayApp.getHttpServer())
-        .post('/api/v1/admin/buildings')
+        .post('/api/v1/buildings')
         .send(createDto)
         .expect(401);
 
@@ -286,7 +286,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       };
 
       await request(gatewayApp.getHttpServer())
-        .post('/api/v1/admin/buildings')
+        .post('/api/v1/buildings')
         .set('x-admin-key', 'wrong-key')
         .send(createDto)
         .expect(401);
@@ -295,7 +295,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
     });
   });
 
-  describe('PUT /api/v1/admin/buildings/:id', () => {
+  describe('PUT /api/v1/buildings/:id', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
 
     it('should proxy request and return updated building (happy path)', async () => {
@@ -317,7 +317,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       mockHttpServiceRequest.mockReturnValue(of(mockResponse));
 
       const response = await request(gatewayApp.getHttpServer())
-        .put(`/api/v1/admin/buildings/${testId}`)
+        .put(`/api/v1/buildings/${testId}`)
         .set('x-admin-key', adminKey)
         .send(updateDto)
         .expect(200);
@@ -325,7 +325,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.title.en).toBe('Updated Building');
       expect(mockHttpServiceRequest).toHaveBeenCalled();
-      validateResponse(200, response.body, '/api/v1/admin/buildings/{id}', 'PUT');
+      validateResponse(200, response.body, '/api/v1/buildings/{id}', 'PUT');
     });
 
     it('should return 401 for missing admin key', async () => {
@@ -335,7 +335,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       };
 
       await request(gatewayApp.getHttpServer())
-        .put(`/api/v1/admin/buildings/${testId}`)
+        .put(`/api/v1/buildings/${testId}`)
         .send(updateDto)
         .expect(401);
 
@@ -343,7 +343,7 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
     });
   });
 
-  describe('DELETE /api/v1/admin/buildings/:id', () => {
+  describe('DELETE /api/v1/buildings/:id', () => {
     const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
 
     it('should proxy request and return deleted building (happy path)', async () => {
@@ -363,21 +363,21 @@ describe('Buildings API Integration Tests (api-gateway)', () => {
       mockHttpServiceRequest.mockReturnValue(of(mockResponse));
 
       const response = await request(gatewayApp.getHttpServer())
-        .delete(`/api/v1/admin/buildings/${testId}`)
+        .delete(`/api/v1/buildings/${testId}`)
         .set('x-admin-key', adminKey)
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.status).toBe('archived');
       expect(mockHttpServiceRequest).toHaveBeenCalled();
-      validateResponse(200, response.body, '/api/v1/admin/buildings/{id}', 'DELETE');
+      validateResponse(200, response.body, '/api/v1/buildings/{id}', 'DELETE');
     });
 
     it('should return 401 for missing admin key', async () => {
       const testId = '00000000-0000-0000-0000-000000000000';
 
       await request(gatewayApp.getHttpServer())
-        .delete(`/api/v1/admin/buildings/${testId}`)
+        .delete(`/api/v1/buildings/${testId}`)
         .expect(401);
 
       expect(mockHttpServiceRequest).not.toHaveBeenCalled();

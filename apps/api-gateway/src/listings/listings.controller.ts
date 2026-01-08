@@ -286,217 +286,11 @@ export class ListingsController {
     const path = `/v1/buildings/${id}${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
   }
-}
-
-@ApiTags('admin-buildings')
-@ApiExtraModels(PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto)
-@Controller('api/v1/admin/buildings')
-@UseGuards(AdminGuard)
-export class AdminListingsController {
-  constructor(
-    private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
-  ) {}
-
-  private getListingsServiceUrl(): string {
-    const url = this.configService.get<string>('LISTINGS_SERVICE_URL');
-    if (!url) {
-      throw new Error('LISTINGS_SERVICE_URL environment variable is required');
-    }
-    return url;
-  }
-
-  private getTimeout(): number {
-    return this.configService.get<number>('LISTINGS_SERVICE_TIMEOUT', 10000);
-  }
-
-  private async proxyRequest(
-    method: string,
-    path: string,
-    req: Request,
-    body?: any,
-  ): Promise<any> {
-    const baseUrl = this.getListingsServiceUrl();
-    const url = `${baseUrl}${path}`;
-    const timeoutMs = this.getTimeout();
-
-    try {
-      const headers: Record<string, string> = {};
-      Object.keys(req.headers).forEach((key) => {
-        const lowerKey = key.toLowerCase();
-        if (
-          !['host', 'connection', 'content-length'].includes(lowerKey) &&
-          req.headers[key]
-        ) {
-          headers[key] = req.headers[key] as string;
-        }
-      });
-
-      if (req.headers['x-request-id']) {
-        headers['x-request-id'] = req.headers['x-request-id'] as string;
-      }
-
-      // Forward admin key to upstream service
-      if (req.headers['x-admin-key']) {
-        headers['x-admin-key'] = req.headers['x-admin-key'] as string;
-      }
-
-      const response = await firstValueFrom(
-        this.httpService
-          .request({
-            method: method as any,
-            url,
-            headers,
-            data: body,
-            timeout: timeoutMs,
-            validateStatus: () => true,
-          })
-          .pipe(
-            timeout(timeoutMs),
-            catchError((error: AxiosError) => {
-              const requestId = req.headers['x-request-id'] as string || 'unknown';
-              if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-                throw new HttpException(
-                  {
-                    error: {
-                      code: 'GATEWAY_TIMEOUT',
-                      message: 'Request to listings service timed out',
-                      details: { service: 'listings-service', timeout: timeoutMs },
-                      requestId,
-                      statusCode: HttpStatus.GATEWAY_TIMEOUT,
-                    },
-                  },
-                  HttpStatus.GATEWAY_TIMEOUT,
-                );
-              }
-
-              if (error.response) {
-                const status = error.response.status;
-                const data = error.response.data as any;
-                if (data?.error) {
-                  throw new HttpException(data, status);
-                }
-                throw new HttpException(
-                  {
-                    error: {
-                      code: status >= 500 ? 'SERVICE_UNAVAILABLE' : 'BAD_REQUEST',
-                      message: data?.message || error.message || 'Request failed',
-                      details: data?.details,
-                      requestId,
-                      statusCode: status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : status,
-                    },
-                  },
-                  status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : status,
-                );
-              }
-
-              throw new HttpException(
-                {
-                  error: {
-                    code: 'SERVICE_UNAVAILABLE',
-                    message: 'Failed to connect to listings service',
-                    details: { service: 'listings-service' },
-                    requestId,
-                    statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-                  },
-                },
-                HttpStatus.SERVICE_UNAVAILABLE,
-              );
-            }),
-          ),
-      );
-
-      if (response.status >= 400) {
-        const errorData = response.data || {};
-        if (errorData.error) {
-          throw new HttpException(errorData, response.status);
-        }
-        const requestId = req.headers['x-request-id'] as string || 'unknown';
-        throw new HttpException(
-          {
-            error: {
-              code: response.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'BAD_REQUEST',
-              message: errorData.message || 'Request failed',
-              details: errorData.details,
-              requestId,
-              statusCode: response.status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : response.status,
-            },
-          },
-          response.status >= 500 ? HttpStatus.SERVICE_UNAVAILABLE : response.status,
-        );
-      }
-
-      if (response.status === 204) {
-        return undefined;
-      }
-      return response.data;
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      const requestId = req.headers['x-request-id'] as string || 'unknown';
-      throw new HttpException(
-        {
-          error: {
-            code: 'INTERNAL_ERROR',
-            message: 'Internal gateway error',
-            requestId,
-            statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          },
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Get paginated list of buildings (admin)' })
-  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
-  @ApiQuery({ name: 'sort', required: false, type: String, description: 'Sort option', enum: ['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc'] })
-  @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency filter', enum: ['AMD', 'USD'] })
-  @ApiQuery({ name: 'price_min', required: false, type: Number, description: 'Minimum price per m² (in selected currency)' })
-  @ApiQuery({ name: 'price_max', required: false, type: Number, description: 'Maximum price per m² (in selected currency)' })
-  @ApiQuery({ name: 'area_min', required: false, type: Number, description: 'Minimum area (m²)' })
-  @ApiQuery({ name: 'area_max', required: false, type: Number, description: 'Maximum area (m²)' })
-  @ApiQuery({ name: 'floors_min', required: false, type: Number, description: 'Minimum number of floors' })
-  @ApiQuery({ name: 'floors_max', required: false, type: Number, description: 'Maximum number of floors' })
-  @ApiQuery({ name: 'region_id', required: false, type: String, description: 'Region ID (UUID)' })
-  @ApiQuery({ name: 'developer_id', required: false, type: String, description: 'Developer ID (UUID)' })
-  @ApiQuery({ name: 'commissioning_date_from', required: false, type: String, description: 'Commissioning date from (ISO 8601 date string)' })
-  @ApiQuery({ name: 'commissioning_date_to', required: false, type: String, description: 'Commissioning date to (ISO 8601 date string)' })
-  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status filter', enum: ['draft', 'published', 'archived', 'all'] })
-  @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
-  @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
-  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
-  @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async findAll(@Req() req: Request): Promise<any> {
-    // Strip search parameter (not supported in Sprint 2)
-    const query = { ...req.query };
-    delete query.search;
-    const queryString = new URLSearchParams(query as Record<string, string>).toString();
-    const path = `/v1/admin/buildings${queryString ? `?${queryString}` : ''}`;
-    return this.proxyRequest('GET', path, req);
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get building by ID (admin)' })
-  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
-  @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
-  @ApiOkResponse({ type: BuildingEnvelopeDto, description: 'Building retrieved successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
-  @ApiResponse({ status: 404, description: 'Building not found' })
-  @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('GET', `/v1/admin/buildings/${id}`, req);
-  }
 
   @Post()
+  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new building (admin)' })
+  @ApiOperation({ summary: 'Create a new building (admin only)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiBody({ 
     description: 'Building data',
@@ -510,11 +304,13 @@ export class AdminListingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async create(@Req() req: Request): Promise<any> {
-    return this.proxyRequest('POST', '/v1/admin/buildings', req, req.body);
+    // proxyRequest already forwards all headers including x-admin-key
+    return this.proxyRequest('POST', '/v1/buildings', req, req.body);
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Update building by ID (admin)' })
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Update building by ID (admin only)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
   @ApiBody({ 
@@ -537,12 +333,14 @@ export class AdminListingsController {
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('PUT', `/v1/admin/buildings/${id}`, req, req.body);
+    // proxyRequest already forwards all headers including x-admin-key
+    return this.proxyRequest('PUT', `/v1/buildings/${id}`, req, req.body);
   }
 
   @Delete(':id')
+  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete building by ID (admin)' })
+  @ApiOperation({ summary: 'Delete building by ID (admin only)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
   @ApiOkResponse({ 
@@ -566,6 +364,8 @@ export class AdminListingsController {
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
-    return this.proxyRequest('DELETE', `/v1/admin/buildings/${id}`, req);
+    // proxyRequest already forwards all headers including x-admin-key
+    return this.proxyRequest('DELETE', `/v1/buildings/${id}`, req);
   }
 }
+

@@ -67,48 +67,9 @@ export class BuildingsController {
     const building = await this.buildingsService.findOne(id, currency || 'AMD', false);
     return { data: building };
   }
-}
-
-@ApiTags('admin-buildings')
-@Controller('v1/admin/buildings')
-@UseGuards(AdminGuard)
-export class AdminBuildingsController {
-  constructor(private readonly buildingsService: BuildingsService) {}
-
-  @Get()
-  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
-  @ApiOperation({ summary: 'Get paginated list of buildings (admin)' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of buildings retrieved successfully',
-    type: PaginatedBuildingsResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
-  async findAll(@Query() query: ListBuildingsQueryDto) {
-    // Admin can see all statuses
-    return this.buildingsService.findAll(query, true);
-  }
-
-  @Get(':id')
-  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
-  @ApiOperation({ summary: 'Get building by ID (admin)' })
-  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Building retrieved successfully',
-    type: BuildingEnvelopeDto,
-  })
-  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
-  @ApiResponse({ status: 404, description: 'Building not found' })
-  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    // Admin can see all statuses
-    const building = await this.buildingsService.findOne(id, 'AMD', true);
-    return { data: building };
-  }
 
   @Post()
+  @UseGuards(AdminGuard)
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new building (admin only)' })
@@ -125,6 +86,7 @@ export class AdminBuildingsController {
   }
 
   @Put(':id')
+  @UseGuards(AdminGuard)
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiOperation({ summary: 'Update a building (admin only)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
@@ -145,6 +107,7 @@ export class AdminBuildingsController {
   }
 
   @Delete(':id')
+  @UseGuards(AdminGuard)
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete a building (admin only)' })
@@ -157,4 +120,5 @@ export class AdminBuildingsController {
     return this.buildingsService.remove(id);
   }
 }
+
 
