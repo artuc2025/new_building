@@ -3,20 +3,23 @@
 #
 # Usage:
 #   ./scripts/review_delta_artifacts.sh [BASE]
-#   BASE=master ./scripts/review_delta_artifacts.sh
+#   BASE=dev-copy ./scripts/review_delta_artifacts.sh
+#   pnpm review:delta --base=dev-copy
 #
 # Arguments:
-#   BASE - Base branch name (default: master, can also be set via environment variable)
+#   BASE - Base branch name (default: dev-copy, can also be set via environment variable BASE or npm_config_base)
 
 set -euo pipefail
 
-# Accept BASE as first argument or from environment, default to master
+# Accept BASE with priority: $1 > BASE env > npm_config_base > default "dev-copy"
 if [ $# -gt 0 ]; then
   BASE="$1"
 elif [ -n "${BASE:-}" ]; then
   BASE="$BASE"
+elif [ -n "${npm_config_base:-}" ]; then
+  BASE="$npm_config_base"
 else
-  BASE="master"
+  BASE="dev-copy"
 fi
 
 # Get repository root

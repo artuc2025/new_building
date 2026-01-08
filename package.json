@@ -5,7 +5,7 @@
   "description": "Real Estate Portal: New Buildings in Armenia",
   "scripts": {
     "review:bundle": "tsx scripts/review-bundle.ts",
-    "review:delta": "bash ./scripts/review_delta_artifacts.sh master",
+    "review:delta": "bash ./scripts/review_delta_artifacts.sh",
     "review:anchor:update": "echo 'To update anchor after Tech Lead approval, run: git rev-parse HEAD > .review/anchor.sha'"
   },
   "devDependencies": {

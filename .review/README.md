@@ -15,7 +15,7 @@ The **anchor** is a commit reference that marks the starting point for delta com
 
 ### Initialization
 
-If `.review/anchor.sha` does not exist, it is automatically initialized to the merge-base of `origin/master` (or the specified `BASE` branch) and `HEAD`.
+If `.review/anchor.sha` does not exist, it is automatically initialized to the merge-base of `origin/dev-copy` (or the specified `BASE` branch) and `HEAD`.
 
 ### Updating the Anchor
 
@@ -40,15 +40,33 @@ pnpm review:anchor:update
 bash ./scripts/review_delta_artifacts.sh [BASE]
 ```
 
-Or use the convenience script (defaults to `master`):
+Or use the convenience script (defaults to `dev-copy`):
 ```bash
 pnpm review:delta
 ```
 
-You can also set BASE via environment variable:
-```bash
-BASE=master bash ./scripts/review_delta_artifacts.sh
-```
+You can override the base branch in several ways:
+
+1. **Positional argument:**
+   ```bash
+   bash ./scripts/review_delta_artifacts.sh dev-copy
+   ```
+
+2. **Environment variable:**
+   ```bash
+   BASE=dev-copy bash ./scripts/review_delta_artifacts.sh
+   ```
+
+3. **npm/pnpm config (for use with pnpm scripts):**
+   ```bash
+   pnpm review:delta --base=dev-copy
+   ```
+
+The base branch selection follows this priority:
+- First positional argument (`$1`) if provided
+- `BASE` environment variable if set
+- `npm_config_base` environment variable if set (from `--base` flag)
+- Default: `dev-copy`
 
 ### What It Does
 
@@ -92,7 +110,7 @@ These paths will be appended to the bundle automatically.
 The bundler enforces limits to keep artifacts manageable:
 - **Max file size**: 512KB per file (default)
 - **Max total size**: 3MB total (default)
-- **Denied files**: `.env`, `.env.local`, `.env.*.local` (never included)
+- **Denied files**: `.env`, `.env.local`, `.env.production`, `.env.development`, `.env.test`, and any file starting with `.env.` (never included by default)
 
 Files exceeding limits or matching deny patterns are listed in the bundle manifest with skip reasons.
 

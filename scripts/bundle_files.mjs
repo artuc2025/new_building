@@ -14,13 +14,16 @@
  *   --deny <list>             Comma-separated list of basenames to deny (e.g., ".env,.env.local")
  */
 
-import { readFileSync, writeFileSync, statSync, existsSync } from 'fs';
-import { resolve, relative, join, basename } from 'path';
+import { readFileSync, writeFileSync, statSync, existsSync, mkdirSync } from 'fs';
+import { resolve, relative, join, basename, dirname as pathDirname } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Default deny list for .env files (always applied)
+const DEFAULT_DENY_LIST = ['.env', '.env.local', '.env.production', '.env.development', '.env.test'];
 
 // Parse command line arguments
 function parseArgs() {
@@ -56,6 +59,9 @@ function parseArgs() {
     console.error('Error: --out, --root, and --paths-file are required');
     process.exit(1);
   }
+
+  // Merge default deny list with user-provided deny list
+  config.deny = Array.from(new Set([...DEFAULT_DENY_LIST, ...config.deny]));
 
   // Resolve paths
   config.out = resolve(config.out);
@@ -130,8 +136,10 @@ function bundleFiles(config) {
       continue;
     }
 
-    // Check deny list
-    if (config.deny.includes(fileName)) {
+    // Check deny list (exact match or prefix match for .env files)
+    const isDenied = config.deny.includes(fileName) || 
+                     (fileName.startsWith('.env') && (fileName === '.env' || fileName.startsWith('.env.')));
+    if (isDenied) {
       skipped.push({
         path: filePath,
         reason: `denied by basename: ${fileName}`
@@ -284,8 +292,12 @@ function bundleFiles(config) {
 
   lines.push('='.repeat(80));
 
-  // Write output
+  // Write output (ensure parent directory exists)
   const output = lines.join('\n');
+  const outDir = pathDirname(config.out);
+  if (!existsSync(outDir)) {
+    mkdirSync(outDir, { recursive: true });
+  }
   writeFileSync(config.out, output, 'utf-8');
 
   // Print summary to stderr (so stdout can be used for other purposes)
