@@ -74,9 +74,23 @@ git diff --name-only "$ANCHOR..HEAD" > "$CHANGED_FILES" || {
 # Filter out noisy paths
 FILTERED_FILES="$REVIEW_DIR/changed_files.delta.filtered.txt"
 if [ -s "$CHANGED_FILES" ]; then
-  # Filter patterns: lock files, dist folders (root and nested), generated OpenAPI JSON (flexible naming)
-  grep -vE '^(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|^dist/|.*/dist/|^openapi.*\.json$|.*/openapi.*\.json$)$' "$CHANGED_FILES" > "$FILTERED_FILES" || true
-  # Ensure file exists even if grep produces no output
+  # Filter in stages for readability and robustness
+  # Stage 1: Filter lock files
+  grep -vE '^(pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$' "$CHANGED_FILES" > "$FILTERED_FILES" || true
+  
+  # Stage 2: Filter dist folders (root and nested)
+  if [ -s "$FILTERED_FILES" ]; then
+    grep -vE '(^dist/|.*/dist/)' "$FILTERED_FILES" > "$FILTERED_FILES.tmp" || true
+    mv "$FILTERED_FILES.tmp" "$FILTERED_FILES"
+  fi
+  
+  # Stage 3: Filter generated OpenAPI JSON (root and nested)
+  if [ -s "$FILTERED_FILES" ]; then
+    grep -vE '(^openapi.*\.json$|.*/openapi.*\.json$)' "$FILTERED_FILES" > "$FILTERED_FILES.tmp" || true
+    mv "$FILTERED_FILES.tmp" "$FILTERED_FILES"
+  fi
+  
+  # Ensure file exists even if all filters produce no output
   touch "$FILTERED_FILES"
 else
   > "$FILTERED_FILES"

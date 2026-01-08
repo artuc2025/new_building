@@ -17,6 +17,15 @@ The **anchor** is a commit reference that marks the starting point for delta com
 
 If `.review/anchor.sha` does not exist, it is automatically initialized to the merge-base of `origin/dev-copy` (or the specified `BASE` branch) and `HEAD`.
 
+**Important**: Anchor initialization requires `origin/<base>` to be available locally. If initialization fails, the script will fail-fast with an error message suggesting you run:
+```bash
+git fetch origin <base>
+```
+or:
+```bash
+git fetch origin
+```
+
 ### Updating the Anchor
 
 **IMPORTANT**: The anchor must only be updated manually after Tech Lead approval.
@@ -78,12 +87,24 @@ The base branch selection follows this priority:
 
 ### Filtered Paths
 
-The following patterns are automatically excluded:
-- `pnpm-lock.yaml`
-- `package-lock.json`
-- `yarn.lock`
-- Any `dist/` folders
-- Generated `openapi.json` files
+The following patterns are automatically excluded as "noise" to keep review diffs focused on meaningful changes:
+
+1. **Lock files** - Dependency lock files that change frequently but don't require review:
+   - `pnpm-lock.yaml`
+   - `package-lock.json`
+   - `yarn.lock`
+
+2. **Build artifacts** - Compiled/generated output directories:
+   - `dist/` folders (both at root and nested)
+
+3. **Generated OpenAPI files** - Auto-generated API specification files:
+   - `openapi*.json` files (both at root and nested)
+
+These files are filtered because they are typically:
+- Auto-generated or machine-managed
+- Large and change frequently
+- Not directly reviewed by humans
+- Regenerated from source files that are already tracked
 
 ### Adding Dependencies
 
