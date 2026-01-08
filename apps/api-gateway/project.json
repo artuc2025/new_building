@@ -24,7 +24,8 @@
       "options": {
         "command": "pnpm --filter @new-building-portal/api-gateway test",
         "cwd": "{projectRoot}"
-      }
+      },
+      "dependsOn": ["openapi:generate"]
     },
     "openapi:generate": {
       "executor": "nx:run-commands",
