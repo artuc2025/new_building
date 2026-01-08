@@ -225,16 +225,28 @@ export class ListingsController {
   @ApiOperation({ summary: 'Get paginated list of buildings (public)' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
-  @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency filter' })
+  @ApiQuery({ name: 'sort', required: false, type: String, description: 'Sort option', enum: ['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc'] })
+  @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency filter', enum: ['AMD', 'USD'] })
+  @ApiQuery({ name: 'price_min', required: false, type: Number, description: 'Minimum price per m² (in selected currency)' })
+  @ApiQuery({ name: 'price_max', required: false, type: Number, description: 'Maximum price per m² (in selected currency)' })
+  @ApiQuery({ name: 'area_min', required: false, type: Number, description: 'Minimum area (m²)' })
+  @ApiQuery({ name: 'area_max', required: false, type: Number, description: 'Maximum area (m²)' })
+  @ApiQuery({ name: 'floors_min', required: false, type: Number, description: 'Minimum number of floors' })
+  @ApiQuery({ name: 'floors_max', required: false, type: Number, description: 'Maximum number of floors' })
+  @ApiQuery({ name: 'region_id', required: false, type: String, description: 'Region ID (UUID)' })
+  @ApiQuery({ name: 'developer_id', required: false, type: String, description: 'Developer ID (UUID)' })
+  @ApiQuery({ name: 'commissioning_date_from', required: false, type: String, description: 'Commissioning date from (ISO 8601 date string)' })
+  @ApiQuery({ name: 'commissioning_date_to', required: false, type: String, description: 'Commissioning date to (ISO 8601 date string)' })
   @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
   @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
     // Public endpoints: strip status parameter to enforce published-only
+    // Also strip search parameter (not supported in Sprint 2)
     const query = { ...req.query };
     delete query.status;
+    delete query.search;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/buildings${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
@@ -422,14 +434,28 @@ export class AdminListingsController {
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
+  @ApiQuery({ name: 'sort', required: false, type: String, description: 'Sort option', enum: ['price_asc', 'price_desc', 'date_desc', 'date_asc', 'area_asc', 'area_desc'] })
+  @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency filter', enum: ['AMD', 'USD'] })
+  @ApiQuery({ name: 'price_min', required: false, type: Number, description: 'Minimum price per m² (in selected currency)' })
+  @ApiQuery({ name: 'price_max', required: false, type: Number, description: 'Maximum price per m² (in selected currency)' })
+  @ApiQuery({ name: 'area_min', required: false, type: Number, description: 'Minimum area (m²)' })
+  @ApiQuery({ name: 'area_max', required: false, type: Number, description: 'Maximum area (m²)' })
+  @ApiQuery({ name: 'floors_min', required: false, type: Number, description: 'Minimum number of floors' })
+  @ApiQuery({ name: 'floors_max', required: false, type: Number, description: 'Maximum number of floors' })
+  @ApiQuery({ name: 'region_id', required: false, type: String, description: 'Region ID (UUID)' })
+  @ApiQuery({ name: 'developer_id', required: false, type: String, description: 'Developer ID (UUID)' })
+  @ApiQuery({ name: 'commissioning_date_from', required: false, type: String, description: 'Commissioning date from (ISO 8601 date string)' })
+  @ApiQuery({ name: 'commissioning_date_to', required: false, type: String, description: 'Commissioning date to (ISO 8601 date string)' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status filter', enum: ['draft', 'published', 'archived', 'all'] })
   @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
   @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
-    const query = req.query;
+    // Strip search parameter (not supported in Sprint 2)
+    const query = { ...req.query };
+    delete query.search;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/admin/buildings${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);

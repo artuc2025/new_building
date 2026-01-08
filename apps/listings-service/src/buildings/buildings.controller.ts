@@ -26,9 +26,8 @@ import {
   UpdateBuildingDto,
   ListBuildingsQueryDto,
   PublicListBuildingsQueryDto,
-  BuildingResponseDto,
-  PaginatedBuildingsResponseDto,
 } from './dto';
+import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto } from '@new-building-portal/contracts';
 import { AdminGuard } from '../common/guards/admin.guard';
 
 @ApiTags('buildings')
@@ -44,7 +43,7 @@ export class BuildingsController {
     type: PaginatedBuildingsResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
-  async findAll(@Query() query: PublicListBuildingsQueryDto): Promise<PaginatedBuildingsResponseDto> {
+  async findAll(@Query() query: PublicListBuildingsQueryDto) {
     // Public endpoints only return published buildings
     return this.buildingsService.findAll(query as any, false);
   }
@@ -56,14 +55,14 @@ export class BuildingsController {
   @ApiResponse({
     status: 200,
     description: 'Building retrieved successfully',
-    type: BuildingResponseDto,
+    type: BuildingEnvelopeDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   async findOne(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('currency') currency?: string,
-  ): Promise<{ data: BuildingResponseDto }> {
+  ) {
     // Public endpoints only return published buildings
     const building = await this.buildingsService.findOne(id, currency || 'AMD', false);
     return { data: building };
@@ -86,7 +85,7 @@ export class AdminBuildingsController {
   })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
-  async findAll(@Query() query: ListBuildingsQueryDto): Promise<PaginatedBuildingsResponseDto> {
+  async findAll(@Query() query: ListBuildingsQueryDto) {
     // Admin can see all statuses
     return this.buildingsService.findAll(query, true);
   }
@@ -98,12 +97,12 @@ export class AdminBuildingsController {
   @ApiResponse({
     status: 200,
     description: 'Building retrieved successfully',
-    type: BuildingResponseDto,
+    type: BuildingEnvelopeDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
-  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<{ data: BuildingResponseDto }> {
+  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     // Admin can see all statuses
     const building = await this.buildingsService.findOne(id, 'AMD', true);
     return { data: building };
@@ -116,11 +115,11 @@ export class AdminBuildingsController {
   @ApiResponse({
     status: 201,
     description: 'Building created successfully',
-    type: BuildingResponseDto,
+    type: BuildingEnvelopeDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
-  async create(@Body() createDto: CreateBuildingDto): Promise<{ data: BuildingResponseDto }> {
+  async create(@Body() createDto: CreateBuildingDto) {
     const building = await this.buildingsService.create(createDto);
     return { data: building };
   }
@@ -132,7 +131,7 @@ export class AdminBuildingsController {
   @ApiResponse({
     status: 200,
     description: 'Building updated successfully',
-    type: BuildingResponseDto,
+    type: BuildingEnvelopeDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid input data or UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
@@ -140,7 +139,7 @@ export class AdminBuildingsController {
   async update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() updateDto: UpdateBuildingDto,
-  ): Promise<{ data: BuildingResponseDto }> {
+  ) {
     const building = await this.buildingsService.update(id, updateDto);
     return { data: building };
   }

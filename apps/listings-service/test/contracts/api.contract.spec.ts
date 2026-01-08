@@ -14,6 +14,15 @@ import { setupTestDatabase, teardownTestDatabase, clearDatabase } from '../utils
 import { createTestDeveloper, createTestRegion, createTestBuilding } from '../utils/fixtures';
 import { DataSource } from 'typeorm';
 
+// Sprint 2 endpoints that MUST have response schemas for 200/201
+const SPRINT_2_ENDPOINTS = [
+  { path: '/v1/buildings', method: 'GET' },
+  { path: '/v1/buildings/{id}', method: 'GET' },
+  { path: '/v1/admin/buildings', method: 'POST' },
+  { path: '/v1/admin/buildings/{id}', method: 'PUT' },
+  { path: '/v1/admin/buildings/{id}', method: 'DELETE' },
+];
+
 describe('API Contract Tests (listings-service)', () => {
   let app: INestApplication;
   let ajv: Ajv;
@@ -99,8 +108,23 @@ describe('API Contract Tests (listings-service)', () => {
     }
 
     const responseSchema = operation.responses?.[statusCode]?.content?.['application/json']?.schema;
+    
+    // Check if this is a Sprint 2 endpoint requiring strict schema validation
+    const isSprint2Endpoint = SPRINT_2_ENDPOINTS.some(
+      (e) => e.path === path && e.method === method,
+    );
+    
+    // For Sprint 2 endpoints, 200/201 responses MUST have schemas
+    if (isSprint2Endpoint && (statusCode === 200 || statusCode === 201)) {
+      if (!responseSchema) {
+        throw new Error(
+          `Sprint 2 endpoint ${method} ${path} with status ${statusCode} MUST have a response schema defined in OpenAPI spec`,
+        );
+      }
+    }
+    
+    // For error responses (400, 401, 404), schemas are optional (permissive)
     if (!responseSchema) {
-      // Some responses might not have schemas defined (e.g., 404)
       return;
     }
 
