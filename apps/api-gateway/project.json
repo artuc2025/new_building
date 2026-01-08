@@ -30,14 +30,14 @@
     "openapi:generate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx scripts/generate-openapi.ts",
+        "command": "npx ts-node --transpile-only -r tsconfig-paths/register scripts/generate-openapi.ts",
         "cwd": "{projectRoot}"
       }
     },
     "openapi:validate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx scripts/validate-openapi.ts",
+        "command": "npx ts-node --transpile-only -r tsconfig-paths/register scripts/validate-openapi.ts",
         "cwd": "{projectRoot}"
       },
       "dependsOn": ["openapi:generate"]

@@ -3,17 +3,20 @@ import 'reflect-metadata';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
+import { ListingsModule } from '../src/listings/listings.module';
+import { SwaggerModule as GatewaySwaggerModule } from '../src/swagger/swagger.module';
 import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto } from '@new-building-portal/contracts';
 
 async function generateOpenAPI() {
+  let app: INestApplication | null = null;
+  const originalListingsUrl = process.env.LISTINGS_SERVICE_URL;
+  const originalAdminKey = process.env.ADMIN_API_KEY;
+  
   try {
     // Set environment variables for generation (mock service URLs)
-    const originalListingsUrl = process.env.LISTINGS_SERVICE_URL;
-    const originalAdminKey = process.env.ADMIN_API_KEY;
-    
     process.env.LISTINGS_SERVICE_URL = 'http://localhost:3001';
     process.env.ADMIN_API_KEY = 'dummy-key-for-generation';
     // Disable logging to reduce noise
@@ -26,7 +29,7 @@ async function generateOpenAPI() {
     }).compile();
     
     // Create NestJS application from compiled module
-    const app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication();
     
     // Apply same global pipes as in main.ts
     app.useGlobalPipes(
@@ -36,6 +39,9 @@ async function generateOpenAPI() {
         transform: true,
       }),
     );
+    
+    // Initialize the app before generating swagger
+    await app.init();
     
     // Build Swagger document (same as in main.ts)
     const config = new DocumentBuilder()
@@ -59,7 +65,7 @@ async function generateOpenAPI() {
     // extraModels ensures referenced DTOs are included in components.schemas
     const document = SwaggerModule.createDocument(app, config, {
       ignoreGlobalPrefix: false,
-      deepScanRoutes: true,
+      include: [ListingsModule, GatewaySwaggerModule],
       extraModels: [
         PaginatedBuildingsResponseDto,
         BuildingEnvelopeDto,
@@ -75,13 +81,6 @@ async function generateOpenAPI() {
     
     console.log(`✅ OpenAPI spec generated: ${outputPath}`);
     
-    // Always close the app
-    await app.close();
-    
-    // Restore original env vars
-    if (originalListingsUrl !== undefined) process.env.LISTINGS_SERVICE_URL = originalListingsUrl;
-    if (originalAdminKey !== undefined) process.env.ADMIN_API_KEY = originalAdminKey;
-    
     process.exit(0);
   } catch (error) {
     console.error('❌ Error generating OpenAPI spec:', error);
@@ -90,6 +89,15 @@ async function generateOpenAPI() {
       console.error('Stack:', error.stack);
     }
     process.exit(1);
+  } finally {
+    // Always close the app
+    if (app) {
+      await app.close();
+    }
+    
+    // Restore original env vars
+    if (originalListingsUrl !== undefined) process.env.LISTINGS_SERVICE_URL = originalListingsUrl;
+    if (originalAdminKey !== undefined) process.env.ADMIN_API_KEY = originalAdminKey;
   }
 }
 
