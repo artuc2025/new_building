@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class BuildingResponseDto {

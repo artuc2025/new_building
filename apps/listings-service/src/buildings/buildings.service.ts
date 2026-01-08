@@ -33,7 +33,8 @@ export class BuildingsService {
     const skip = (page - 1) * limit;
     const currency = query.currency || 'AMD';
     const sort = query.sort || 'date_desc';
-    const status = query.status || (isAdmin ? 'all' : 'published');
+    // Public endpoints must only expose published buildings (enforce even if status is provided)
+    const status = isAdmin ? (query.status || 'all') : 'published';
 
     // Validate sort enum
     if (!SORT_MAP[sort]) {

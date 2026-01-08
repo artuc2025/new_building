@@ -239,14 +239,31 @@ export class ListingsController {
   @ApiQuery({ name: 'commissioning_date_from', required: false, type: String, description: 'Commissioning date from (ISO 8601 date string)' })
   @ApiQuery({ name: 'commissioning_date_to', required: false, type: String, description: 'Commissioning date to (ISO 8601 date string)' })
   @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status filter (public endpoints only expose published buildings). Defaults to "published".', enum: ['published'], default: 'published' })
   @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
-    // Public endpoints: strip status parameter to enforce published-only
-    // Also strip search parameter (not supported in Sprint 2)
+    // Public endpoints: enforce published-only status
+    // If status is provided, validate it's 'published', otherwise default to 'published'
     const query = { ...req.query };
-    delete query.status;
+    if (query.status && query.status !== 'published') {
+      // Reject any non-published status for public endpoints
+      throw new HttpException(
+        {
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Invalid status value. Public endpoints only accept status="published"',
+            details: { provided: query.status, allowed: ['published'] },
+            statusCode: HttpStatus.BAD_REQUEST,
+          },
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    // Set status to published if not provided or ensure it's published
+    query.status = 'published';
+    // Strip search parameter (not supported in Sprint 2)
     delete query.search;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/buildings${queryString ? `?${queryString}` : ''}`;

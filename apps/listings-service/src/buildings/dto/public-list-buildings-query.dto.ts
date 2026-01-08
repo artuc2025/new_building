@@ -122,5 +122,14 @@ export class PublicListBuildingsQueryDto {
     message: 'bbox must be in format "minLng,minLat,maxLng,maxLat" with 4 numbers',
   })
   bbox?: string;
+
+  @ApiPropertyOptional({
+    description: 'Status filter (public endpoints only expose published buildings). Defaults to "published".',
+    enum: ['published'],
+    default: 'published',
+  })
+  @IsOptional()
+  @IsEnum(['published'])
+  status?: string = 'published';
 }
 

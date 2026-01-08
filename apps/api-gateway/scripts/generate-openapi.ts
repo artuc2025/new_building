@@ -2,10 +2,11 @@
 import 'reflect-metadata';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { NestFactory } from '@nestjs/core';
+import { Test, TestingModule } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
+import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto } from '@new-building-portal/contracts';
 
 async function generateOpenAPI() {
   try {
@@ -18,34 +19,14 @@ async function generateOpenAPI() {
     // Disable logging to reduce noise
     process.env.NODE_ENV = 'production';
     
-    // Create NestJS app directly (similar to main.ts)
-    const app = await NestFactory.create(AppModule, {
-      logger: false, // Disable logging during generation
-    });
+    // Use Test.createTestingModule to avoid external dependencies
+    // This approach compiles the module without initializing connections
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     
-    // Initialize app
-    let initSucceeded = false;
-    try {
-      await app.init();
-      initSucceeded = true;
-    } catch (initError: any) {
-      // Check if it's a connection error (expected for generation)
-      const isConnectionError = 
-        initError?.message?.includes('connect') || 
-        initError?.message?.includes('ECONNREFUSED') ||
-        initError?.message?.includes('timeout') ||
-        initError?.code === 'ECONNREFUSED' ||
-        initError?.code === 'ENOTFOUND' ||
-        initError?.code === 'ETIMEDOUT';
-      
-      if (isConnectionError) {
-        console.warn('⚠️  External service connections failed (expected for OpenAPI generation)');
-        console.warn('   Continuing with Swagger generation...');
-        initSucceeded = false;
-      } else {
-        throw initError;
-      }
-    }
+    // Create NestJS application from compiled module
+    const app = moduleRef.createNestApplication();
     
     // Apply same global pipes as in main.ts
     app.useGlobalPipes(
@@ -74,11 +55,18 @@ async function generateOpenAPI() {
       )
       .build();
     
-    // Create document with options to handle parameter metadata issues
-    // extraModels removed - models are discovered via @ApiExtraModels decorators on controllers
+    // Create document with options to ensure all DTO schemas are included
+    // extraModels ensures referenced DTOs are included in components.schemas
     const document = SwaggerModule.createDocument(app, config, {
       ignoreGlobalPrefix: false,
       deepScanRoutes: true,
+      extraModels: [
+        PaginatedBuildingsResponseDto,
+        BuildingEnvelopeDto,
+        BuildingResponseDto,
+        PaginationMetaDto,
+        ResponseMetaDto,
+      ],
     });
     
     // Write to openapi.json in service root
@@ -87,6 +75,7 @@ async function generateOpenAPI() {
     
     console.log(`✅ OpenAPI spec generated: ${outputPath}`);
     
+    // Always close the app
     await app.close();
     
     // Restore original env vars
