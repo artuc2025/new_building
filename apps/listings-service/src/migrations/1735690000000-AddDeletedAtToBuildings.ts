@@ -10,7 +10,7 @@ export class AddDeletedAtToBuildings1735690000000 implements MigrationInterface 
     `);
 
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_buildings_deleted_at 
+      CREATE INDEX IF NOT EXISTS listings.idx_buildings_deleted_at 
       ON listings.buildings(deleted_at) 
       WHERE deleted_at IS NULL;
     `);

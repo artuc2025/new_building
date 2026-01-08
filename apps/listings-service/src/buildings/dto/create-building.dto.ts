@@ -14,7 +14,7 @@ import {
   IsBoolean,
   IsArray,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type, Transform, Expose } from 'class-transformer';
 
 class LocationDto {
   @ApiProperty({ description: 'Latitude', example: 40.1811 })
@@ -65,12 +65,22 @@ export class CreateBuildingDto {
   @ApiProperty({ description: 'Address line 1', required: false })
   @IsOptional()
   @IsString()
-  address_line_1?: string;
+  @Expose({ name: 'address_line_1' })
+  @Transform(({ obj }) => {
+    // Accept both camelCase and snake_case for backwards compatibility
+    return obj?.addressLine1 ?? obj?.address_line_1;
+  })
+  addressLine1?: string;
 
   @ApiProperty({ description: 'Address line 2', required: false })
   @IsOptional()
   @IsString()
-  address_line_2?: string;
+  @Expose({ name: 'address_line_2' })
+  @Transform(({ obj }) => {
+    // Accept both camelCase and snake_case for backwards compatibility
+    return obj?.addressLine2 ?? obj?.address_line_2;
+  })
+  addressLine2?: string;
 
   @ApiProperty({ description: 'City', example: 'Yerevan', default: 'Yerevan' })
   @IsOptional()
@@ -80,7 +90,12 @@ export class CreateBuildingDto {
   @ApiProperty({ description: 'Postal code', required: false })
   @IsOptional()
   @IsString()
-  postal_code?: string;
+  @Expose({ name: 'postal_code' })
+  @Transform(({ obj }) => {
+    // Accept both camelCase and snake_case for backwards compatibility
+    return obj?.postalCode ?? obj?.postal_code;
+  })
+  postalCode?: string;
 
   @ApiProperty({ description: 'Number of floors', example: 10 })
   @IsNotEmpty()

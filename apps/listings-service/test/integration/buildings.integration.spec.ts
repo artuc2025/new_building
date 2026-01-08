@@ -132,6 +132,61 @@ describe('Buildings API Integration Tests (listings-service)', () => {
         .query({ page: -1, limit: 200 })
         .expect(400);
     });
+
+    it('should filter buildings by bbox location (happy path)', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      
+      // Create building inside bbox (Yerevan center: 44.5091, 40.1811)
+      const buildingInside = await createTestBuilding(
+        dataSource,
+        developer.id,
+        region.id,
+        {
+          status: 'published',
+          location: 'POINT(44.5091 40.1811)', // Inside bbox
+        },
+      );
+      
+      // Create building outside bbox
+      const buildingOutside = await createTestBuilding(
+        dataSource,
+        developer.id,
+        region.id,
+        {
+          status: 'published',
+          location: 'POINT(45.0 41.0)', // Outside bbox
+        },
+      );
+
+      // Bbox: minLng=44.45, minLat=40.15, maxLng=44.60, maxLat=40.25
+      const response = await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ bbox: '44.45,40.15,44.60,40.25' })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      
+      // Should only return building inside bbox
+      const buildingIds = response.body.data.map((b: any) => b.id);
+      expect(buildingIds).toContain(buildingInside.id);
+      expect(buildingIds).not.toContain(buildingOutside.id);
+    });
+
+    it('should return 400 for invalid bbox format', async () => {
+      await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ bbox: 'invalid' })
+        .expect(400);
+    });
+
+    it('should return 400 for bbox with wrong number of values', async () => {
+      await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ bbox: '44.45,40.15,44.60' }) // Only 3 values
+        .expect(400);
+    });
   });
 
   describe('GET /v1/buildings/:id', () => {
@@ -198,6 +253,66 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body.data.title.en).toBe('New Building');
 
       validateResponse(201, response.body, '/v1/admin/buildings', 'POST');
+    });
+
+    it('should accept camelCase fields (addressLine1, addressLine2, postalCode)', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: developer.id,
+        regionId: region.id,
+        addressLine1: '123 Main Street',
+        addressLine2: 'Apt 4B',
+        postalCode: '0001',
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .set('x-admin-key', adminKey)
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data.addressLine1).toBe('123 Main Street');
+      expect(response.body.data.addressLine2).toBe('Apt 4B');
+      expect(response.body.data.postalCode).toBe('0001');
+    });
+
+    it('should accept snake_case fields (address_line_1, address_line_2, postal_code) for backwards compatibility', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: developer.id,
+        regionId: region.id,
+        address_line_1: '456 Oak Avenue',
+        address_line_2: 'Suite 200',
+        postal_code: '0002',
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .set('x-admin-key', adminKey)
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data.addressLine1).toBe('456 Oak Avenue');
+      expect(response.body.data.addressLine2).toBe('Suite 200');
+      expect(response.body.data.postalCode).toBe('0002');
     });
 
     it('should return 401 for missing admin key', async () => {

@@ -115,10 +115,10 @@ export class BuildingsService {
       title: createDto.title,
       description: createDto.description,
       address: createDto.address,
-      address_line_1: createDto.address_line_1,
-      address_line_2: createDto.address_line_2,
+      address_line_1: createDto.addressLine1,
+      address_line_2: createDto.addressLine2,
       city: createDto.city || 'Yerevan',
-      postal_code: createDto.postal_code,
+      postal_code: createDto.postalCode,
       floors: createDto.floors,
       total_units: createDto.totalUnits,
       commissioning_date: createDto.commissioningDate,
@@ -169,10 +169,10 @@ export class BuildingsService {
     if (updateDto.title !== undefined) updateData.title = updateDto.title;
     if (updateDto.description !== undefined) updateData.description = updateDto.description;
     if (updateDto.address !== undefined) updateData.address = updateDto.address;
-    if (updateDto.address_line_1 !== undefined) updateData.address_line_1 = updateDto.address_line_1;
-    if (updateDto.address_line_2 !== undefined) updateData.address_line_2 = updateDto.address_line_2;
+    if (updateDto.addressLine1 !== undefined) updateData.address_line_1 = updateDto.addressLine1;
+    if (updateDto.addressLine2 !== undefined) updateData.address_line_2 = updateDto.addressLine2;
     if (updateDto.city !== undefined) updateData.city = updateDto.city;
-    if (updateDto.postal_code !== undefined) updateData.postal_code = updateDto.postal_code;
+    if (updateDto.postalCode !== undefined) updateData.postal_code = updateDto.postalCode;
     if (updateDto.floors !== undefined) updateData.floors = updateDto.floors;
     if (updateDto.totalUnits !== undefined) updateData.total_units = updateDto.totalUnits;
     if (updateDto.commissioningDate !== undefined) updateData.commissioning_date = updateDto.commissioningDate;
@@ -286,6 +286,23 @@ export class BuildingsService {
       qb.andWhere('building.commissioning_date <= :commissioning_date_to', {
         commissioning_date_to: query.commissioning_date_to,
       });
+    }
+
+    // Bounding box location filter
+    if (query.bbox) {
+      const bboxParts = query.bbox.split(',').map((s) => parseFloat(s.trim()));
+      if (bboxParts.length === 4 && bboxParts.every((n) => !isNaN(n))) {
+        const [minLng, minLat, maxLng, maxLat] = bboxParts;
+        // Validate bbox bounds
+        if (minLng < maxLng && minLat < maxLat) {
+          // Use ST_Within with geometry cast for geography column
+          // Note: location is stored as GEOGRAPHY(POINT, 4326), so we cast to geometry for ST_Within
+          qb.andWhere(
+            'ST_Within(building.location::geometry, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))',
+            { minLng, minLat, maxLng, maxLat },
+          );
+        }
+      }
     }
   }
 

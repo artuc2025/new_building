@@ -14,7 +14,8 @@ import {
   HttpException,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto } from '@new-building-portal/contracts';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -226,7 +227,8 @@ export class ListingsController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
   @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency filter' })
-  @ApiResponse({ status: 200, description: 'List of buildings retrieved successfully' })
+  @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
+  @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
@@ -242,7 +244,7 @@ export class ListingsController {
   @ApiOperation({ summary: 'Get building by ID (public)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
   @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency for price conversion' })
-  @ApiResponse({ status: 200, description: 'Building retrieved successfully' })
+  @ApiOkResponse({ type: BuildingEnvelopeDto, description: 'Building retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
@@ -421,7 +423,8 @@ export class AdminListingsController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
-  @ApiResponse({ status: 200, description: 'List of buildings retrieved successfully' })
+  @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
+  @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
@@ -436,7 +439,7 @@ export class AdminListingsController {
   @ApiOperation({ summary: 'Get building by ID (admin)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
-  @ApiResponse({ status: 200, description: 'Building retrieved successfully' })
+  @ApiOkResponse({ type: BuildingEnvelopeDto, description: 'Building retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
@@ -456,7 +459,7 @@ export class AdminListingsController {
       additionalProperties: true,
     },
   })
-  @ApiResponse({ status: 201, description: 'Building created successfully' })
+  @ApiCreatedResponse({ type: BuildingEnvelopeDto, description: 'Building created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
@@ -475,7 +478,7 @@ export class AdminListingsController {
       additionalProperties: true,
     },
   })
-  @ApiResponse({ status: 200, description: 'Building updated successfully' })
+  @ApiOkResponse({ type: BuildingEnvelopeDto, description: 'Building updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data or UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
@@ -489,7 +492,22 @@ export class AdminListingsController {
   @ApiOperation({ summary: 'Delete building by ID (admin)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
-  @ApiResponse({ status: 200, description: 'Building deleted successfully' })
+  @ApiOkResponse({ 
+    description: 'Building deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            status: { type: 'string', enum: ['archived'] },
+            deletedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 404, description: 'Building not found' })

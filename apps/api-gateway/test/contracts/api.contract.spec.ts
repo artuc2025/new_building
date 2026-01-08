@@ -111,7 +111,14 @@ describe('API Contract Tests (api-gateway)', () => {
 
     const responseSchema = operation.responses?.[statusCode]?.content?.['application/json']?.schema;
     if (!responseSchema) {
-      // Some responses might not have schemas defined
+      // For Sprint 2 endpoints, missing schema is a failure
+      const isSprint2Endpoint = SPRINT_2_ENDPOINTS.some(
+        (e) => e.path === path && e.method === method,
+      );
+      if (isSprint2Endpoint && (statusCode === 200 || statusCode === 201)) {
+        throw new Error(`Sprint 2 endpoint missing response schema for ${statusCode}: ${method} ${path}`);
+      }
+      // For other responses, silently return
       return;
     }
 

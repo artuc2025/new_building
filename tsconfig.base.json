@@ -20,7 +20,8 @@
       "@new-building-portal/listings-service": ["apps/listings-service/src/index.ts"],
       "@new-building-portal/media-service": ["apps/media-service/src/index.ts"],
       "@new-building-portal/content-service": ["apps/content-service/src/index.ts"],
-      "@new-building-portal/analytics-service": ["apps/analytics-service/src/index.ts"]
+      "@new-building-portal/analytics-service": ["apps/analytics-service/src/index.ts"],
+      "@new-building-portal/contracts": ["libs/contracts/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

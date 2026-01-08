@@ -15,6 +15,8 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('API_PREFIX', '');
   
   // Global validation pipe
+  // Note: @Expose({ name: 'snake_case' }) on DTO properties allows both camelCase and snake_case
+  // for backwards compatibility. The Transform decorator maps snake_case to camelCase.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -22,6 +24,7 @@ async function bootstrap() {
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
+        exposeDefaultValues: true,
       },
     }),
   );

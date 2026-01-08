@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   IsOptional,
   IsNumber,
@@ -8,6 +8,8 @@ import {
   Min,
   Max,
   IsEnum,
+  IsString,
+  Matches,
 } from 'class-validator';
 
 /**
@@ -109,5 +111,16 @@ export class PublicListBuildingsQueryDto {
   @IsOptional()
   @IsEnum(['AMD', 'USD'])
   currency?: string = 'AMD';
+
+  @ApiPropertyOptional({
+    description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat" (e.g., "44.45,40.15,44.60,40.25")',
+    example: '44.45,40.15,44.60,40.25',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^-?\d+\.?\d*,-?\d+\.?\d*,-?\d+\.?\d*,-?\d+\.?\d*$/, {
+    message: 'bbox must be in format "minLng,minLat,maxLng,maxLat" with 4 numbers',
+  })
+  bbox?: string;
 }
 
