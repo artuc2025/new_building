@@ -34,10 +34,18 @@ mkdir -p "$REVIEW_DIR"
 ANCHOR_FILE="$REVIEW_DIR/anchor.sha"
 if [ ! -f "$ANCHOR_FILE" ]; then
   echo "Initializing anchor from merge-base of origin/$BASE and HEAD..."
-  git merge-base "origin/$BASE" HEAD > "$ANCHOR_FILE" || {
-    echo "Warning: Could not compute merge-base. Using HEAD as anchor."
-    git rev-parse HEAD > "$ANCHOR_FILE"
-  }
+  if ! git merge-base "origin/$BASE" HEAD > "$ANCHOR_FILE" 2>/dev/null; then
+    echo "Error: Could not compute merge-base for origin/$BASE and HEAD" >&2
+    echo "" >&2
+    echo "This usually means origin/$BASE is not available locally." >&2
+    echo "To fix this, run:" >&2
+    echo "  git fetch origin $BASE" >&2
+    echo "or:" >&2
+    echo "  git fetch origin" >&2
+    echo "" >&2
+    echo "The anchor file was NOT created. Please fetch the base branch and try again." >&2
+    exit 1
+  fi
 fi
 
 # Read anchor
@@ -66,8 +74,8 @@ git diff --name-only "$ANCHOR..HEAD" > "$CHANGED_FILES" || {
 # Filter out noisy paths
 FILTERED_FILES="$REVIEW_DIR/changed_files.delta.filtered.txt"
 if [ -s "$CHANGED_FILES" ]; then
-  # Filter patterns: lock files, dist folders, generated OpenAPI JSON
-  grep -vE '^(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|.*/dist/|.*/openapi\.json)$' "$CHANGED_FILES" > "$FILTERED_FILES" || true
+  # Filter patterns: lock files, dist folders (root and nested), generated OpenAPI JSON (flexible naming)
+  grep -vE '^(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|^dist/|.*/dist/|^openapi.*\.json$|.*/openapi.*\.json$)$' "$CHANGED_FILES" > "$FILTERED_FILES" || true
   # Ensure file exists even if grep produces no output
   touch "$FILTERED_FILES"
 else

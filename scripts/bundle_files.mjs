@@ -22,8 +22,10 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Default deny list for .env files (always applied)
+// Default deny list for .env files and secret/cert files (always applied)
 const DEFAULT_DENY_LIST = ['.env', '.env.local', '.env.production', '.env.development', '.env.test'];
+const DEFAULT_DENY_EXTENSIONS = ['.pem', '.key', '.pfx', '.crt'];
+const DEFAULT_DENY_BASENAMES = ['id_rsa', 'id_ed25519'];
 
 // Parse command line arguments
 function parseArgs() {
@@ -137,12 +139,28 @@ function bundleFiles(config) {
     }
 
     // Check deny list (exact match or prefix match for .env files)
-    const isDenied = config.deny.includes(fileName) || 
-                     (fileName.startsWith('.env') && (fileName === '.env' || fileName.startsWith('.env.')));
-    if (isDenied) {
+    const isDeniedByName = config.deny.includes(fileName) || 
+                           (fileName.startsWith('.env') && (fileName === '.env' || fileName.startsWith('.env.')));
+    
+    // Check default deny extensions (e.g., .pem, .key, .pfx, .crt)
+    const fileExt = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '';
+    const isDeniedByExt = DEFAULT_DENY_EXTENSIONS.includes(fileExt);
+    
+    // Check default deny basenames (e.g., id_rsa, id_ed25519)
+    const isDeniedByBasename = DEFAULT_DENY_BASENAMES.includes(fileName);
+    
+    if (isDeniedByName || isDeniedByExt || isDeniedByBasename) {
+      let reason = 'denied';
+      if (isDeniedByName) {
+        reason = `denied by basename: ${fileName}`;
+      } else if (isDeniedByExt) {
+        reason = `denied by extension: ${fileExt}`;
+      } else if (isDeniedByBasename) {
+        reason = `denied by basename: ${fileName}`;
+      }
       skipped.push({
         path: filePath,
-        reason: `denied by basename: ${fileName}`
+        reason: reason
       });
       continue;
     }
