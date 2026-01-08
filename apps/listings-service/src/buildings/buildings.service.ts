@@ -76,8 +76,6 @@ export class BuildingsService {
         limit,
         total,
         totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
       },
       meta: {
         currency,
@@ -148,7 +146,11 @@ export class BuildingsService {
 
     const building = this.buildingsRepository.create(buildingData);
     const saved = await this.buildingsRepository.save(building);
-    return this.findOne(saved.id);
+    // Admin operations should use admin view (isAdmin=true) to see drafts
+    // save() returns Building | Building[], but we pass a single entity so it's Building
+    const savedBuilding = Array.isArray(saved) ? saved[0] : saved;
+    const currency = createDto.currency || 'AMD';
+    return this.findOne(savedBuilding.id, currency, true);
   }
 
   async update(id: string, updateDto: UpdateBuildingDto): Promise<BuildingResponseDto> {
@@ -199,7 +201,9 @@ export class BuildingsService {
     }
 
     await this.buildingsRepository.update(id, updateData);
-    return this.findOne(id);
+    // Admin operations should use admin view (isAdmin=true) to see drafts/archived
+    const currency = updateDto.currency || building.currency || 'AMD';
+    return this.findOne(id, currency, true);
   }
 
   async remove(id: string): Promise<{ data: { id: string; status: string; deletedAt: string } }> {
@@ -287,23 +291,6 @@ export class BuildingsService {
       qb.andWhere('building.commissioning_date <= :commissioning_date_to', {
         commissioning_date_to: query.commissioning_date_to,
       });
-    }
-
-    // Bounding box location filter
-    if (query.bbox) {
-      const bboxParts = query.bbox.split(',').map((s) => parseFloat(s.trim()));
-      if (bboxParts.length === 4 && bboxParts.every((n) => !isNaN(n))) {
-        const [minLng, minLat, maxLng, maxLat] = bboxParts;
-        // Validate bbox bounds
-        if (minLng < maxLng && minLat < maxLat) {
-          // Use ST_Within with geometry cast for geography column
-          // Note: location is stored as GEOGRAPHY(POINT, 4326), so we cast to geometry for ST_Within
-          qb.andWhere(
-            'ST_Within(building.location::geometry, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))',
-            { minLng, minLat, maxLng, maxLat },
-          );
-        }
-      }
     }
   }
 

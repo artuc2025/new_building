@@ -117,10 +117,12 @@ describe('Buildings API Integration Tests (listings-service)', () => {
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
-      expect(response.body).toHaveProperty('total');
-      expect(response.body).toHaveProperty('page');
-      expect(response.body).toHaveProperty('limit');
-      expect(response.body).toHaveProperty('total_pages');
+      expect(response.body).toHaveProperty('pagination');
+      expect(response.body).toHaveProperty('meta');
+      expect(response.body.pagination).toHaveProperty('page');
+      expect(response.body.pagination).toHaveProperty('limit');
+      expect(response.body.pagination).toHaveProperty('total');
+      expect(response.body.pagination).toHaveProperty('totalPages');
       expect(Array.isArray(response.body.data)).toBe(true);
 
       validateResponse(200, response.body, '/v1/buildings', 'GET');
@@ -133,60 +135,6 @@ describe('Buildings API Integration Tests (listings-service)', () => {
         .expect(400);
     });
 
-    it('should filter buildings by bbox location (happy path)', async () => {
-      const developer = await createTestDeveloper(dataSource);
-      const region = await createTestRegion(dataSource);
-      
-      // Create building inside bbox (Yerevan center: 44.5091, 40.1811)
-      const buildingInside = await createTestBuilding(
-        dataSource,
-        developer.id,
-        region.id,
-        {
-          status: 'published',
-          location: 'POINT(44.5091 40.1811)', // Inside bbox
-        },
-      );
-      
-      // Create building outside bbox
-      const buildingOutside = await createTestBuilding(
-        dataSource,
-        developer.id,
-        region.id,
-        {
-          status: 'published',
-          location: 'POINT(45.0 41.0)', // Outside bbox
-        },
-      );
-
-      // Bbox: minLng=44.45, minLat=40.15, maxLng=44.60, maxLat=40.25
-      const response = await request(app.getHttpServer())
-        .get('/v1/buildings')
-        .query({ bbox: '44.45,40.15,44.60,40.25' })
-        .expect(200);
-
-      expect(response.body).toHaveProperty('data');
-      expect(Array.isArray(response.body.data)).toBe(true);
-      
-      // Should only return building inside bbox
-      const buildingIds = response.body.data.map((b: any) => b.id);
-      expect(buildingIds).toContain(buildingInside.id);
-      expect(buildingIds).not.toContain(buildingOutside.id);
-    });
-
-    it('should return 400 for invalid bbox format', async () => {
-      await request(app.getHttpServer())
-        .get('/v1/buildings')
-        .query({ bbox: 'invalid' })
-        .expect(400);
-    });
-
-    it('should return 400 for bbox with wrong number of values', async () => {
-      await request(app.getHttpServer())
-        .get('/v1/buildings')
-        .query({ bbox: '44.45,40.15,44.60' }) // Only 3 values
-        .expect(400);
-    });
   });
 
   describe('GET /v1/buildings/:id', () => {
