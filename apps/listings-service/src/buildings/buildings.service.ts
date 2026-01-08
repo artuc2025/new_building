@@ -42,8 +42,6 @@ export class BuildingsService {
 
     const qb = this.buildingsRepository
       .createQueryBuilder('building')
-      .leftJoinAndSelect('building.developer', 'developer')
-      .leftJoinAndSelect('building.region', 'region')
       .where('building.deleted_at IS NULL');
 
     // Apply status filter (admin can see all, public only sees published)
@@ -91,7 +89,6 @@ export class BuildingsService {
   async findOne(id: string, currency: string = 'AMD'): Promise<BuildingResponseDto> {
     const building = await this.buildingsRepository.findOne({
       where: { id, deleted_at: null },
-      relations: ['developer', 'region'],
     });
 
     if (!building) {
@@ -227,20 +224,31 @@ export class BuildingsService {
   }
 
   private applyFilters(qb: SelectQueryBuilder<Building>, query: ListBuildingsQueryDto): void {
-    // Price range filter
-    if (query.price_min !== undefined) {
-      qb.andWhere('building.price_per_m2_min >= :price_min', { price_min: query.price_min });
-    }
-    if (query.price_max !== undefined) {
-      qb.andWhere('building.price_per_m2_max <= :price_max', { price_max: query.price_max });
+    // Price range filter - overlap (intersection) logic
+    // Two ranges overlap if: range1_max >= range2_min AND range1_min <= range2_max
+    if (query.price_min !== undefined && query.price_max !== undefined) {
+      // Both min and max provided: overlap check
+      qb.andWhere('building.price_per_m2_max >= :price_min', { price_min: query.price_min });
+      qb.andWhere('building.price_per_m2_min <= :price_max', { price_max: query.price_max });
+    } else if (query.price_min !== undefined) {
+      // Only min provided: building's max must be >= filter min
+      qb.andWhere('building.price_per_m2_max >= :price_min', { price_min: query.price_min });
+    } else if (query.price_max !== undefined) {
+      // Only max provided: building's min must be <= filter max
+      qb.andWhere('building.price_per_m2_min <= :price_max', { price_max: query.price_max });
     }
 
-    // Area range filter
-    if (query.area_min !== undefined) {
-      qb.andWhere('building.area_min >= :area_min', { area_min: query.area_min });
-    }
-    if (query.area_max !== undefined) {
-      qb.andWhere('building.area_max <= :area_max', { area_max: query.area_max });
+    // Area range filter - overlap (intersection) logic
+    if (query.area_min !== undefined && query.area_max !== undefined) {
+      // Both min and max provided: overlap check
+      qb.andWhere('building.area_max >= :area_min', { area_min: query.area_min });
+      qb.andWhere('building.area_min <= :area_max', { area_max: query.area_max });
+    } else if (query.area_min !== undefined) {
+      // Only min provided: building's max must be >= filter min
+      qb.andWhere('building.area_max >= :area_min', { area_min: query.area_min });
+    } else if (query.area_max !== undefined) {
+      // Only max provided: building's min must be <= filter max
+      qb.andWhere('building.area_min <= :area_max', { area_max: query.area_max });
     }
 
     // Floors range filter

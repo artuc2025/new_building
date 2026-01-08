@@ -12,8 +12,9 @@ import {
   HttpCode,
   HttpStatus,
   HttpException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiExcludeController } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -21,7 +22,7 @@ import { firstValueFrom, timeout, catchError } from 'rxjs';
 import { AxiosError } from 'axios';
 import { AdminGuard } from '../common/guards/admin.guard';
 
-@ApiExcludeController()
+@ApiTags('buildings')
 @Controller('api/v1/buildings')
 export class ListingsController {
   constructor(
@@ -225,6 +226,9 @@ export class ListingsController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
   @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency filter' })
+  @ApiResponse({ status: 200, description: 'List of buildings retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
+  @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
     const query = req.query;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
@@ -234,9 +238,13 @@ export class ListingsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get building by ID (public)' })
-  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
   @ApiQuery({ name: 'currency', required: false, type: String, description: 'Currency for price conversion' })
-  async findOne(@Param('id') id: string, @Req() req: Request): Promise<any> {
+  @ApiResponse({ status: 200, description: 'Building retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
+  @ApiResponse({ status: 404, description: 'Building not found' })
+  @ApiResponse({ status: 503, description: 'Service unavailable' })
+  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     const query = req.query;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/buildings/${id}${queryString ? `?${queryString}` : ''}`;
@@ -244,7 +252,7 @@ export class ListingsController {
   }
 }
 
-@ApiExcludeController()
+@ApiTags('admin-buildings')
 @Controller('api/v1/admin/buildings')
 @UseGuards(AdminGuard)
 export class AdminListingsController {
@@ -405,9 +413,14 @@ export class AdminListingsController {
 
   @Get()
   @ApiOperation({ summary: 'Get paginated list of buildings (admin)' })
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query' })
+  @ApiResponse({ status: 200, description: 'List of buildings retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
+  @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
     const query = req.query;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
@@ -417,14 +430,21 @@ export class AdminListingsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get building by ID (admin)' })
-  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
-  async findOne(@Param('id') id: string, @Req() req: Request): Promise<any> {
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
+  @ApiResponse({ status: 200, description: 'Building retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
+  @ApiResponse({ status: 404, description: 'Building not found' })
+  @ApiResponse({ status: 503, description: 'Service unavailable' })
+  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     return this.proxyRequest('GET', `/v1/admin/buildings/${id}`, req);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new building (admin)' })
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiBody({ 
     description: 'Building data',
     schema: {
@@ -432,13 +452,18 @@ export class AdminListingsController {
       additionalProperties: true,
     },
   })
+  @ApiResponse({ status: 201, description: 'Building created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
+  @ApiResponse({ status: 503, description: 'Service unavailable' })
   async create(@Req() req: Request): Promise<any> {
     return this.proxyRequest('POST', '/v1/admin/buildings', req, req.body);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update building by ID (admin)' })
-  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
   @ApiBody({ 
     description: 'Updated building data',
     schema: {
@@ -446,15 +471,26 @@ export class AdminListingsController {
       additionalProperties: true,
     },
   })
-  async update(@Param('id') id: string, @Req() req: Request): Promise<any> {
+  @ApiResponse({ status: 200, description: 'Building updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data or UUID format' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
+  @ApiResponse({ status: 404, description: 'Building not found' })
+  @ApiResponse({ status: 503, description: 'Service unavailable' })
+  async update(@Param('id', new (await import('@nestjs/common')).ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     return this.proxyRequest('PUT', `/v1/admin/buildings/${id}`, req, req.body);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete building by ID (admin)' })
-  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
-  async remove(@Param('id') id: string, @Req() req: Request): Promise<any> {
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
+  @ApiResponse({ status: 200, description: 'Building deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
+  @ApiResponse({ status: 404, description: 'Building not found' })
+  @ApiResponse({ status: 503, description: 'Service unavailable' })
+  async remove(@Param('id', new (await import('@nestjs/common')).ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     return this.proxyRequest('DELETE', `/v1/admin/buildings/${id}`, req);
   }
 }

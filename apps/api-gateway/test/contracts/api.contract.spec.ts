@@ -1,17 +1,29 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import * as request from 'supertest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import SwaggerParser from '@apidevtools/swagger-parser';
+import { of } from 'rxjs';
 import { AppModule } from '../../src/app.module';
 
 describe('API Contract Tests (api-gateway)', () => {
   let app: INestApplication;
   let ajv: Ajv;
   let openApiSpec: any;
+  let httpService: HttpService;
+
+  // Sprint 2 endpoints that MUST be in the OpenAPI spec
+  const SPRINT_2_ENDPOINTS = [
+    { path: '/api/v1/buildings', method: 'GET' },
+    { path: '/api/v1/buildings/{id}', method: 'GET' },
+    { path: '/api/v1/admin/buildings', method: 'POST' },
+    { path: '/api/v1/admin/buildings/{id}', method: 'PUT' },
+    { path: '/api/v1/admin/buildings/{id}', method: 'DELETE' },
+  ];
 
   beforeAll(async () => {
     // Load OpenAPI spec from generated file
@@ -23,6 +35,18 @@ describe('API Contract Tests (api-gateway)', () => {
       throw new Error(`Failed to load OpenAPI spec from ${specPath}. Run 'pnpm nx run api-gateway:openapi:generate' first.`);
     }
 
+    // Verify Sprint 2 endpoints are in the spec
+    for (const endpoint of SPRINT_2_ENDPOINTS) {
+      const pathObj = openApiSpec.paths[endpoint.path];
+      if (!pathObj) {
+        throw new Error(`Sprint 2 endpoint missing from OpenAPI spec: ${endpoint.method} ${endpoint.path}`);
+      }
+      const operation = pathObj[endpoint.method.toLowerCase()];
+      if (!operation) {
+        throw new Error(`Sprint 2 endpoint missing from OpenAPI spec: ${endpoint.method} ${endpoint.path}`);
+      }
+    }
+
     // Setup Ajv for schema validation
     ajv = new Ajv({ allErrors: true, strict: false });
     addFormats(ajv);
@@ -31,10 +55,15 @@ describe('API Contract Tests (api-gateway)', () => {
     process.env.LISTINGS_SERVICE_URL = process.env.LISTINGS_SERVICE_URL || 'http://localhost:3001';
     process.env.ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'test-admin-key';
 
-    // Create NestJS app
+    // Create NestJS app with mocked HttpService
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(HttpService)
+      .useValue({
+        request: jest.fn(),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -45,6 +74,8 @@ describe('API Contract Tests (api-gateway)', () => {
       }),
     );
     await app.init();
+
+    httpService = moduleFixture.get<HttpService>(HttpService);
   });
 
   afterAll(async () => {
@@ -55,12 +86,26 @@ describe('API Contract Tests (api-gateway)', () => {
   const validateResponse = (statusCode: number, responseBody: any, path: string, method: string) => {
     const pathObj = openApiSpec.paths[path];
     if (!pathObj) {
-      // Some paths might not be in the spec (e.g., proxied paths)
+      // For Sprint 2 endpoints, this is a failure
+      const isSprint2Endpoint = SPRINT_2_ENDPOINTS.some(
+        (e) => e.path === path && e.method === method,
+      );
+      if (isSprint2Endpoint) {
+        throw new Error(`Sprint 2 endpoint missing from OpenAPI spec: ${method} ${path}`);
+      }
+      // For other paths, silently return (e.g., proxied paths)
       return;
     }
 
     const operation = pathObj[method.toLowerCase()];
     if (!operation) {
+      // For Sprint 2 endpoints, this is a failure
+      const isSprint2Endpoint = SPRINT_2_ENDPOINTS.some(
+        (e) => e.path === path && e.method === method,
+      );
+      if (isSprint2Endpoint) {
+        throw new Error(`Sprint 2 endpoint missing from OpenAPI spec: ${method} ${path}`);
+      }
       return;
     }
 
@@ -172,6 +217,226 @@ describe('API Contract Tests (api-gateway)', () => {
       expect(response.body.error).toHaveProperty('message');
       expect(response.body.error).toHaveProperty('requestId');
       expect(response.body.error).toHaveProperty('statusCode');
+    });
+  });
+
+  describe('POST /api/v1/admin/buildings', () => {
+    const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
+
+    it('should return 401 when missing x-admin-key', async () => {
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: '00000000-0000-0000-0000-000000000000',
+        regionId: '00000000-0000-0000-0000-000000000000',
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/admin/buildings')
+        .send(createDto)
+        .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
+      expect(response.body.error).toHaveProperty('message');
+    });
+
+    it('should return 401 when x-admin-key is invalid', async () => {
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: '00000000-0000-0000-0000-000000000000',
+        regionId: '00000000-0000-0000-0000-000000000000',
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/admin/buildings')
+        .set('x-admin-key', 'wrong-key')
+        .send(createDto)
+        .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should return 201 for happy path with valid x-admin-key', async () => {
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: '00000000-0000-0000-0000-000000000000',
+        regionId: '00000000-0000-0000-0000-000000000000',
+      };
+
+      const mockResponse = {
+        status: 201,
+        data: {
+          data: {
+            id: '00000000-0000-0000-0000-000000000001',
+            title: { en: 'New Building' },
+            address: { en: 'New Address' },
+            location: { lat: 40.1811, lng: 44.5091 },
+            floors: 5,
+            areaMin: 60,
+            areaMax: 120,
+            currency: 'AMD',
+            developerId: '00000000-0000-0000-0000-000000000000',
+            regionId: '00000000-0000-0000-0000-000000000000',
+            status: 'draft',
+          },
+        },
+      };
+
+      jest.spyOn(httpService, 'request').mockReturnValue(of(mockResponse) as any);
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/admin/buildings')
+        .set('x-admin-key', adminKey)
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('data');
+      validateResponse(201, response.body, '/api/v1/admin/buildings', 'POST');
+    });
+
+    it('should return 400 for validation error', async () => {
+      const invalidDto = {
+        title: null, // Invalid
+        floors: -1, // Invalid
+      };
+
+      const mockErrorResponse = {
+        status: 400,
+        data: {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid input data',
+            statusCode: 400,
+          },
+        },
+      };
+
+      jest.spyOn(httpService, 'request').mockReturnValue(of(mockErrorResponse) as any);
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/admin/buildings')
+        .set('x-admin-key', adminKey)
+        .send(invalidDto)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
+    });
+  });
+
+  describe('PUT /api/v1/admin/buildings/:id', () => {
+    const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
+    const testId = '00000000-0000-0000-0000-000000000000';
+
+    it('should return 401 when missing x-admin-key', async () => {
+      const updateDto = {
+        title: { en: 'Updated Building' },
+      };
+
+      await request(app.getHttpServer())
+        .put(`/api/v1/admin/buildings/${testId}`)
+        .send(updateDto)
+        .expect(401);
+    });
+
+    it('should return 200 for happy path with valid x-admin-key', async () => {
+      const updateDto = {
+        title: { en: 'Updated Building' },
+      };
+
+      const mockResponse = {
+        status: 200,
+        data: {
+          data: {
+            id: testId,
+            title: { en: 'Updated Building' },
+            address: { en: 'New Address' },
+            location: { lat: 40.1811, lng: 44.5091 },
+            floors: 5,
+            areaMin: 60,
+            areaMax: 120,
+            currency: 'AMD',
+            developerId: '00000000-0000-0000-0000-000000000000',
+            regionId: '00000000-0000-0000-0000-000000000000',
+            status: 'draft',
+          },
+        },
+      };
+
+      jest.spyOn(httpService, 'request').mockReturnValue(of(mockResponse) as any);
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/v1/admin/buildings/${testId}`)
+        .set('x-admin-key', adminKey)
+        .send(updateDto)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      validateResponse(200, response.body, '/api/v1/admin/buildings/{id}', 'PUT');
+    });
+
+    it('should return 400 for invalid UUID format', async () => {
+      await request(app.getHttpServer())
+        .put('/api/v1/admin/buildings/invalid-uuid')
+        .set('x-admin-key', adminKey)
+        .send({ title: { en: 'Updated' } })
+        .expect(400);
+    });
+  });
+
+  describe('DELETE /api/v1/admin/buildings/:id', () => {
+    const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
+    const testId = '00000000-0000-0000-0000-000000000000';
+
+    it('should return 401 when missing x-admin-key', async () => {
+      await request(app.getHttpServer())
+        .delete(`/api/v1/admin/buildings/${testId}`)
+        .expect(401);
+    });
+
+    it('should return 200 for happy path with valid x-admin-key', async () => {
+      const mockResponse = {
+        status: 200,
+        data: {
+          data: {
+            id: testId,
+            status: 'archived',
+            deletedAt: new Date().toISOString(),
+          },
+        },
+      };
+
+      jest.spyOn(httpService, 'request').mockReturnValue(of(mockResponse) as any);
+
+      const response = await request(app.getHttpServer())
+        .delete(`/api/v1/admin/buildings/${testId}`)
+        .set('x-admin-key', adminKey)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      validateResponse(200, response.body, '/api/v1/admin/buildings/{id}', 'DELETE');
+    });
+
+    it('should return 400 for invalid UUID format', async () => {
+      await request(app.getHttpServer())
+        .delete('/api/v1/admin/buildings/invalid-uuid')
+        .set('x-admin-key', adminKey)
+        .expect(400);
     });
   });
 });

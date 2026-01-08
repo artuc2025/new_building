@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +18,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
-  ApiBearerAuth,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { BuildingsService } from './buildings.service';
 import {
@@ -55,9 +56,10 @@ export class BuildingsController {
     description: 'Building retrieved successfully',
     type: BuildingResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   async findOne(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('currency') currency?: string,
   ): Promise<{ data: BuildingResponseDto }> {
     const building = await this.buildingsService.findOne(id, currency || 'AMD');
@@ -72,7 +74,7 @@ export class AdminBuildingsController {
   constructor(private readonly buildingsService: BuildingsService) {}
 
   @Get()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiOperation({ summary: 'Get paginated list of buildings (admin)' })
   @ApiResponse({
     status: 200,
@@ -87,7 +89,7 @@ export class AdminBuildingsController {
   }
 
   @Get(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiOperation({ summary: 'Get building by ID (admin)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
   @ApiResponse({
@@ -95,15 +97,16 @@ export class AdminBuildingsController {
     description: 'Building retrieved successfully',
     type: BuildingResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
-  async findOne(@Param('id') id: string): Promise<{ data: BuildingResponseDto }> {
+  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<{ data: BuildingResponseDto }> {
     const building = await this.buildingsService.findOne(id);
     return { data: building };
   }
 
   @Post()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new building (admin only)' })
   @ApiResponse({
@@ -119,7 +122,7 @@ export class AdminBuildingsController {
   }
 
   @Put(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiOperation({ summary: 'Update a building (admin only)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
   @ApiResponse({
@@ -127,11 +130,11 @@ export class AdminBuildingsController {
     description: 'Building updated successfully',
     type: BuildingResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 400, description: 'Invalid input data or UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() updateDto: UpdateBuildingDto,
   ): Promise<{ data: BuildingResponseDto }> {
     const building = await this.buildingsService.update(id, updateDto);
@@ -139,14 +142,15 @@ export class AdminBuildingsController {
   }
 
   @Delete(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete a building (admin only)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
   @ApiResponse({ status: 200, description: 'Building deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
-  async remove(@Param('id') id: string): Promise<{ data: { id: string; status: string; deletedAt: string } }> {
+  async remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<{ data: { id: string; status: string; deletedAt: string } }> {
     return this.buildingsService.remove(id);
   }
 }

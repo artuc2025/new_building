@@ -95,16 +95,23 @@ describe('BuildingsController (Contract Tests)', () => {
 
       const result = await controller.findAll({ page: 1, limit: 10 });
 
-      // Validate response structure matches OpenAPI schema
+      // Validate response structure matches OpenAPI schema (new envelope format)
       expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('total');
-      expect(result).toHaveProperty('page');
-      expect(result).toHaveProperty('limit');
-      expect(result).toHaveProperty('total_pages');
+      expect(result).toHaveProperty('pagination');
+      expect(result).toHaveProperty('meta');
       expect(Array.isArray(result.data)).toBe(true);
-      expect(result.page).toBe(1);
-      expect(result.limit).toBe(10);
-      expect(result.total).toBe(1);
+      expect(result.pagination).toHaveProperty('page');
+      expect(result.pagination).toHaveProperty('limit');
+      expect(result.pagination).toHaveProperty('total');
+      expect(result.pagination).toHaveProperty('totalPages');
+      expect(result.pagination).toHaveProperty('hasNext');
+      expect(result.pagination).toHaveProperty('hasPrev');
+      expect(result.pagination.page).toBe(1);
+      expect(result.pagination.limit).toBe(10);
+      expect(result.pagination.total).toBe(1);
+      expect(result.meta).toHaveProperty('currency');
+      expect(result.meta).toHaveProperty('exchangeRate');
+      expect(result.meta).toHaveProperty('sort');
     });
 
     it('should return 400 for invalid query parameters', async () => {
@@ -121,21 +128,22 @@ describe('BuildingsController (Contract Tests)', () => {
 
       const result = await controller.findOne('building-1');
 
-      // Validate response structure matches OpenAPI schema
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('title');
-      expect(result).toHaveProperty('address');
-      expect(result).toHaveProperty('location');
-      expect(result).toHaveProperty('floors');
-      expect(result).toHaveProperty('area_min');
-      expect(result).toHaveProperty('area_max');
-      expect(result).toHaveProperty('currency');
-      expect(result).toHaveProperty('developer_id');
-      expect(result).toHaveProperty('region_id');
-      expect(result).toHaveProperty('status');
-      expect(result).toHaveProperty('created_at');
-      expect(result).toHaveProperty('updated_at');
-      expect(result.id).toBe('building-1');
+      // Validate response structure matches OpenAPI schema (envelope format)
+      expect(result).toHaveProperty('data');
+      expect(result.data).toHaveProperty('id');
+      expect(result.data).toHaveProperty('title');
+      expect(result.data).toHaveProperty('address');
+      expect(result.data).toHaveProperty('location');
+      expect(result.data).toHaveProperty('floors');
+      expect(result.data).toHaveProperty('areaMin');
+      expect(result.data).toHaveProperty('areaMax');
+      expect(result.data).toHaveProperty('currency');
+      expect(result.data).toHaveProperty('developerId');
+      expect(result.data).toHaveProperty('regionId');
+      expect(result.data).toHaveProperty('status');
+      expect(result.data).toHaveProperty('createdAt');
+      expect(result.data).toHaveProperty('updatedAt');
+      expect(result.data.id).toBe('building-1');
     });
 
     it('should return 404 when building not found', async () => {
@@ -164,10 +172,11 @@ describe('BuildingsController (Contract Tests)', () => {
 
       const result = await controller.create(createDto);
 
-      // Validate response structure matches OpenAPI schema
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('title');
-      expect(result.title.en).toBe('New Building');
+      // Validate response structure matches OpenAPI schema (envelope format)
+      expect(result).toHaveProperty('data');
+      expect(result.data).toHaveProperty('id');
+      expect(result.data).toHaveProperty('title');
+      expect(result.data.title.en).toBe('New Building');
     });
 
     it('should return 400 for invalid input data', async () => {
@@ -195,8 +204,9 @@ describe('BuildingsController (Contract Tests)', () => {
 
       const result = await controller.update('building-1', updateDto);
 
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('title');
+      expect(result).toHaveProperty('data');
+      expect(result.data).toHaveProperty('id');
+      expect(result.data).toHaveProperty('title');
     });
 
     it('should return 404 when building not found', async () => {

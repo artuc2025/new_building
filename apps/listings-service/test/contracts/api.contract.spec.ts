@@ -196,5 +196,151 @@ describe('API Contract Tests (listings-service)', () => {
       expect(response.body.error).toHaveProperty('statusCode');
     });
   });
+
+  describe('POST /v1/admin/buildings', () => {
+    const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
+
+    it('should return 401 when missing x-admin-key', async () => {
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: '00000000-0000-0000-0000-000000000000',
+        regionId: '00000000-0000-0000-0000-000000000000',
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .send(createDto)
+        .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should return 201 for happy path with valid x-admin-key', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+
+      const createDto = {
+        title: { en: 'New Building' },
+        address: { en: 'New Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: developer.id,
+        regionId: region.id,
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .set('x-admin-key', adminKey)
+        .send(createDto)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('data');
+      validateResponse(201, response.body, '/v1/admin/buildings', 'POST');
+    });
+
+    it('should return 400 for validation error', async () => {
+      const invalidDto = {
+        title: null, // Invalid
+        floors: -1, // Invalid
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .set('x-admin-key', adminKey)
+        .send(invalidDto)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
+    });
+  });
+
+  describe('PUT /v1/admin/buildings/:id', () => {
+    const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
+
+    it('should return 401 when missing x-admin-key', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
+
+      const updateDto = {
+        title: { en: 'Updated Building' },
+      };
+
+      await request(app.getHttpServer())
+        .put(`/v1/admin/buildings/${building.id}`)
+        .send(updateDto)
+        .expect(401);
+    });
+
+    it('should return 200 for happy path with valid x-admin-key', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
+
+      const updateDto = {
+        title: { en: 'Updated Building' },
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/v1/admin/buildings/${building.id}`)
+        .set('x-admin-key', adminKey)
+        .send(updateDto)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'PUT');
+    });
+
+    it('should return 400 for invalid UUID format', async () => {
+      await request(app.getHttpServer())
+        .put('/v1/admin/buildings/invalid-uuid')
+        .set('x-admin-key', adminKey)
+        .send({ title: { en: 'Updated' } })
+        .expect(400);
+    });
+  });
+
+  describe('DELETE /v1/admin/buildings/:id', () => {
+    const adminKey = process.env.ADMIN_API_KEY || 'test-admin-key';
+
+    it('should return 401 when missing x-admin-key', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
+
+      await request(app.getHttpServer())
+        .delete(`/v1/admin/buildings/${building.id}`)
+        .expect(401);
+    });
+
+    it('should return 200 for happy path with valid x-admin-key', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
+
+      const response = await request(app.getHttpServer())
+        .delete(`/v1/admin/buildings/${building.id}`)
+        .set('x-admin-key', adminKey)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'DELETE');
+    });
+
+    it('should return 400 for invalid UUID format', async () => {
+      await request(app.getHttpServer())
+        .delete('/v1/admin/buildings/invalid-uuid')
+        .set('x-admin-key', adminKey)
+        .expect(400);
+    });
+  });
 });
 
