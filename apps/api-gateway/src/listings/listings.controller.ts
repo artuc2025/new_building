@@ -230,7 +230,9 @@ export class ListingsController {
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<any> {
-    const query = req.query;
+    // Public endpoints: strip status parameter to enforce published-only
+    const query = { ...req.query };
+    delete query.status;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/buildings${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
@@ -245,7 +247,9 @@ export class ListingsController {
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
-    const query = req.query;
+    // Public endpoints: strip status parameter to enforce published-only
+    const query = { ...req.query };
+    delete query.status;
     const queryString = new URLSearchParams(query as Record<string, string>).toString();
     const path = `/v1/buildings/${id}${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
@@ -476,7 +480,7 @@ export class AdminListingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async update(@Param('id', new (await import('@nestjs/common')).ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
+  async update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     return this.proxyRequest('PUT', `/v1/admin/buildings/${id}`, req, req.body);
   }
 
@@ -490,7 +494,7 @@ export class AdminListingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async remove(@Param('id', new (await import('@nestjs/common')).ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
+  async remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     return this.proxyRequest('DELETE', `/v1/admin/buildings/${id}`, req);
   }
 }

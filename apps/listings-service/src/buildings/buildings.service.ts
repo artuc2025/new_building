@@ -86,9 +86,16 @@ export class BuildingsService {
     };
   }
 
-  async findOne(id: string, currency: string = 'AMD'): Promise<BuildingResponseDto> {
+  async findOne(id: string, currency: string = 'AMD', isAdmin: boolean = false): Promise<BuildingResponseDto> {
+    const where: any = { id, deleted_at: null };
+    
+    // Public endpoints only see published buildings
+    if (!isAdmin) {
+      where.status = 'published';
+    }
+
     const building = await this.buildingsRepository.findOne({
-      where: { id, deleted_at: null },
+      where,
     });
 
     if (!building) {

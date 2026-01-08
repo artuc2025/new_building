@@ -25,6 +25,7 @@ import {
   CreateBuildingDto,
   UpdateBuildingDto,
   ListBuildingsQueryDto,
+  PublicListBuildingsQueryDto,
   BuildingResponseDto,
   PaginatedBuildingsResponseDto,
 } from './dto';
@@ -43,8 +44,9 @@ export class BuildingsController {
     type: PaginatedBuildingsResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
-  async findAll(@Query() query: ListBuildingsQueryDto): Promise<PaginatedBuildingsResponseDto> {
-    return this.buildingsService.findAll(query);
+  async findAll(@Query() query: PublicListBuildingsQueryDto): Promise<PaginatedBuildingsResponseDto> {
+    // Public endpoints only return published buildings
+    return this.buildingsService.findAll(query as any, false);
   }
 
   @Get(':id')
@@ -62,7 +64,8 @@ export class BuildingsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('currency') currency?: string,
   ): Promise<{ data: BuildingResponseDto }> {
-    const building = await this.buildingsService.findOne(id, currency || 'AMD');
+    // Public endpoints only return published buildings
+    const building = await this.buildingsService.findOne(id, currency || 'AMD', false);
     return { data: building };
   }
 }
@@ -101,7 +104,8 @@ export class AdminBuildingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<{ data: BuildingResponseDto }> {
-    const building = await this.buildingsService.findOne(id);
+    // Admin can see all statuses
+    const building = await this.buildingsService.findOne(id, 'AMD', true);
     return { data: building };
   }
 

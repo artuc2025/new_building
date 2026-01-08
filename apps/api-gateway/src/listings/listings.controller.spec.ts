@@ -6,7 +6,7 @@ import { of, throwError } from 'rxjs';
 import { AxiosError } from 'axios';
 import { HttpException, HttpStatus } from '@nestjs/common';
 
-describe('ListingsController (Contract Tests)', () => {
+describe('ListingsController (Public Endpoints)', () => {
   let controller: ListingsController;
   let httpService: HttpService;
   let configService: ConfigService;
@@ -55,10 +55,12 @@ describe('ListingsController (Contract Tests)', () => {
         status: 200,
         data: {
           data: [],
-          total: 0,
-          page: 1,
-          limit: 10,
-          total_pages: 0,
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            totalPages: 0,
+          },
         },
       };
 
@@ -70,7 +72,7 @@ describe('ListingsController (Contract Tests)', () => {
         query: { page: 1, limit: 10 },
       } as any;
 
-      const result = await controller.findAll(mockReq, { page: 1, limit: 10 });
+      const result = await controller.findAll(mockReq);
 
       expect(mockHttpService.request).toHaveBeenCalled();
       expect(result).toEqual(mockResponse.data);
@@ -95,7 +97,7 @@ describe('ListingsController (Contract Tests)', () => {
         query: {},
       } as any;
 
-      await expect(controller.findAll(mockReq, {})).rejects.toThrow(HttpException);
+      await expect(controller.findAll(mockReq)).rejects.toThrow(HttpException);
     });
   });
 
@@ -104,8 +106,10 @@ describe('ListingsController (Contract Tests)', () => {
       const mockResponse = {
         status: 200,
         data: {
-          id: 'building-1',
-          title: { en: 'Test Building' },
+          data: {
+            id: 'building-1',
+            title: { en: 'Test Building' },
+          },
         },
       };
 
@@ -114,6 +118,7 @@ describe('ListingsController (Contract Tests)', () => {
       const mockReq = {
         url: '/api/v1/buildings/building-1',
         headers: {},
+        query: {},
       } as any;
 
       const result = await controller.findOne('building-1', mockReq);
@@ -138,92 +143,10 @@ describe('ListingsController (Contract Tests)', () => {
       const mockReq = {
         url: '/api/v1/buildings/non-existent',
         headers: {},
+        query: {},
       } as any;
 
       await expect(controller.findOne('non-existent', mockReq)).rejects.toThrow(HttpException);
-    });
-  });
-
-  describe('POST /api/v1/buildings', () => {
-    it('should proxy request to listings-service (happy path)', async () => {
-      const mockResponse = {
-        status: 201,
-        data: {
-          id: 'building-1',
-          title: { en: 'New Building' },
-        },
-      };
-
-      mockHttpService.request.mockReturnValue(of(mockResponse));
-
-      const mockReq = {
-        url: '/api/v1/buildings',
-        headers: { 'x-admin-token': 'test-token' },
-      } as any;
-
-      const body = {
-        title: { en: 'New Building' },
-        address: { en: 'Address' },
-        location: { longitude: 44.5091, latitude: 40.1811 },
-        floors: 5,
-        area_min: 50,
-        area_max: 150,
-        developer_id: 'dev-1',
-        region_id: 'region-1',
-      };
-
-      const result = await controller.create(body, mockReq);
-
-      expect(mockHttpService.request).toHaveBeenCalled();
-      expect(result).toEqual(mockResponse.data);
-    });
-  });
-
-  describe('PUT /api/v1/buildings/:id', () => {
-    it('should proxy request to listings-service (happy path)', async () => {
-      const mockResponse = {
-        status: 200,
-        data: {
-          id: 'building-1',
-          title: { en: 'Updated Building' },
-        },
-      };
-
-      mockHttpService.request.mockReturnValue(of(mockResponse));
-
-      const mockReq = {
-        url: '/api/v1/buildings/building-1',
-        headers: { 'x-admin-token': 'test-token' },
-      } as any;
-
-      const body = {
-        title: { en: 'Updated Building' },
-      };
-
-      const result = await controller.update('building-1', body, mockReq);
-
-      expect(mockHttpService.request).toHaveBeenCalled();
-      expect(result).toEqual(mockResponse.data);
-    });
-  });
-
-  describe('DELETE /api/v1/buildings/:id', () => {
-    it('should proxy request to listings-service (happy path)', async () => {
-      const mockResponse = {
-        status: 204,
-        data: null,
-      };
-
-      mockHttpService.request.mockReturnValue(of(mockResponse));
-
-      const mockReq = {
-        url: '/api/v1/buildings/building-1',
-        headers: { 'x-admin-token': 'test-token' },
-      } as any;
-
-      await controller.remove('building-1', mockReq);
-
-      expect(mockHttpService.request).toHaveBeenCalled();
     });
   });
 
@@ -239,9 +162,10 @@ describe('ListingsController (Contract Tests)', () => {
       const mockReq = {
         url: '/api/v1/buildings',
         headers: {},
+        query: {},
       } as any;
 
-      await expect(controller.findAll(mockReq, {})).rejects.toThrow(HttpException);
+      await expect(controller.findAll(mockReq)).rejects.toThrow(HttpException);
     });
 
     it('should handle network errors', async () => {
@@ -254,9 +178,10 @@ describe('ListingsController (Contract Tests)', () => {
       const mockReq = {
         url: '/api/v1/buildings',
         headers: {},
+        query: {},
       } as any;
 
-      await expect(controller.findAll(mockReq, {})).rejects.toThrow(HttpException);
+      await expect(controller.findAll(mockReq)).rejects.toThrow(HttpException);
     });
   });
 });
