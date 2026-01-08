@@ -4,31 +4,13 @@ import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from '../src/app.module';
+import { Test } from '@nestjs/testing';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { BuildingsModule } from '../src/buildings/buildings.module';
+import { SwaggerModule as AppSwaggerModule } from '../src/swagger/swagger.module';
 
 async function generateOpenAPI() {
-  // Track if we've seen a connection error
-  let hasConnectionError = false;
-  
-  // Handle unhandled rejections to catch TypeORM connection errors
-  const rejectionHandler = (reason: any) => {
-    const isConnectionError = 
-      reason?.message?.includes('connect') || 
-      reason?.message?.includes('ECONNREFUSED') ||
-      reason?.code === 'ECONNREFUSED' ||
-      reason?.name === 'AggregateError' ||
-      (reason?.errors && Array.isArray(reason.errors) && 
-       reason.errors.some((e: any) => e?.code === 'ECONNREFUSED'));
-    
-    if (isConnectionError) {
-      hasConnectionError = true;
-      // Don't crash - we'll handle it
-      console.log('⚠️  Caught database connection error (expected for generation)');
-    }
-  };
-  
-  process.on('unhandledRejection', rejectionHandler);
-  
   try {
     // Set environment to skip DB connection for generation
     process.env.SKIP_DB_CONNECTION = 'true';
@@ -36,93 +18,39 @@ async function generateOpenAPI() {
     // Disable logging to reduce noise
     process.env.NODE_ENV = 'production';
     
-    // Create NestJS app instance
-    // TypeORM connection will fail, but we'll catch and continue
-    // Swagger doesn't need a database connection - it only needs controller metadata
-    let app;
+    // Create testing module with TypeORM that will fail to connect
+    // We'll catch the error and continue with Swagger generation
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['.env.local', '.env'],
+        }),
+        TypeOrmModule.forRoot({
+          type: 'postgres',
+          url: 'postgresql://invalid:invalid@localhost:1/invalid',
+          schema: 'listings',
+          synchronize: false,
+          logging: false,
+          entities: [__dirname + '/../src/**/*.entity{.ts,.js}'],
+          migrations: [__dirname + '/../src/migrations/*{.ts,.js}'],
+          migrationsTableName: 'typeorm_migrations',
+          migrationsRun: false,
+          retryAttempts: 0,
+          connectTimeoutMS: 1,
+          extra: {
+            connectionTimeoutMillis: 1,
+          },
+          autoLoadEntities: false,
+        }),
+        BuildingsModule,
+        AppSwaggerModule,
+      ],
+    })
+      .compile();
     
-    try {
-      app = await NestFactory.create(AppModule, { 
-        logger: false,
-        abortOnError: false, // Don't abort on errors during generation
-      });
-    } catch (createError: any) {
-      // Check if it's a connection error (including AggregateError)
-      const isConnectionError = 
-        createError?.message?.includes('connect') || 
-        createError?.message?.includes('ECONNREFUSED') ||
-        createError?.code === 'ECONNREFUSED' ||
-        createError?.code === 'ENOTFOUND' ||
-        createError?.name === 'ConnectionError' ||
-        createError?.name === 'AggregateError' ||
-        (createError?.errors && Array.isArray(createError.errors) && 
-         createError.errors.some((e: any) => 
-           e?.code === 'ECONNREFUSED' || 
-           e?.message?.includes('connect') ||
-           e?.message?.includes('ECONNREFUSED')
-         ));
-      
-      if (isConnectionError) {
-        console.log('⚠️  Database connection failed (expected for generation), continuing...');
-        // The app might still be partially created, try to continue
-        // TypeORM connection failure shouldn't prevent Swagger generation
-        try {
-          // Wait a bit for any async operations to settle
-          await new Promise(resolve => setTimeout(resolve, 500));
-          // Try creating the app again - sometimes it works on retry
-          app = await NestFactory.create(AppModule, { 
-            logger: false,
-            abortOnError: false,
-          });
-        } catch (retryError: any) {
-          // If retry also fails with connection error, that's fine
-          // We'll try to proceed anyway since Swagger doesn't need DB
-          const isRetryConnectionError = 
-            retryError?.message?.includes('connect') || 
-            retryError?.message?.includes('ECONNREFUSED') ||
-            retryError?.code === 'ECONNREFUSED' ||
-            retryError?.code === 'ENOTFOUND' ||
-            retryError?.name === 'ConnectionError' ||
-            retryError?.name === 'AggregateError' ||
-            (retryError?.errors && Array.isArray(retryError.errors) && 
-             retryError.errors.some((e: any) => 
-               e?.code === 'ECONNREFUSED' || 
-               e?.message?.includes('connect') ||
-               e?.message?.includes('ECONNREFUSED')
-             ));
-          
-          if (!isRetryConnectionError) {
-            // If it's not a connection error, re-throw
-            throw retryError;
-          }
-          // If it's still a connection error, log and try to continue
-          // Swagger generation might still work even if TypeORM failed
-          console.log('⚠️  Database connection still failing (expected), attempting to continue with Swagger generation...');
-          // Try one more time with a longer delay
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          try {
-            app = await NestFactory.create(AppModule, { 
-              logger: false,
-              abortOnError: false,
-            });
-          } catch (finalError: any) {
-            // If it still fails, we can't create the app
-            // This means TypeORM is blocking app creation
-            console.error('❌ Unable to create NestJS app due to database connection error');
-            console.error('TypeORM is preventing app initialization. This should not happen during OpenAPI generation.');
-            throw new Error('App creation failed: TypeORM connection error during OpenAPI generation. Please ensure TypeORM can be skipped during generation.');
-          }
-        }
-      } else {
-        // If it's not a connection error, re-throw
-        throw createError;
-      }
-    }
-    
-    // Ensure app was created successfully
-    if (!app) {
-      throw new Error('NestJS app was not created successfully');
-    }
+    // Create NestJS app from testing module
+    const app = moduleRef.createNestApplication();
     
     // Apply same global pipes as in main.ts (needed for Swagger to work properly)
     app.useGlobalPipes(
@@ -136,6 +64,34 @@ async function generateOpenAPI() {
       }),
     );
     
+    // Initialize app - TypeORM connection will fail, but we'll catch and continue
+    let initSucceeded = false;
+    try {
+      await app.init();
+      initSucceeded = true;
+    } catch (initError: any) {
+      // Check if it's a connection error
+      const isConnectionError = 
+        initError?.message?.includes('connect') || 
+        initError?.message?.includes('ECONNREFUSED') ||
+        initError?.message?.includes('timeout') ||
+        initError?.message?.includes('Connection terminated') ||
+        initError?.code === 'ECONNREFUSED' ||
+        initError?.code === 'ETIMEDOUT' ||
+        initError?.name === 'ConnectionError';
+      
+      if (isConnectionError) {
+        // Connection failed, but Swagger doesn't need DB
+        // Continue with Swagger generation anyway
+        console.warn('⚠️  Database connection failed (expected for OpenAPI generation)');
+        console.warn('   Continuing with Swagger generation...');
+        initSucceeded = false;
+      } else {
+        // Not a connection error, re-throw
+        throw initError;
+      }
+    }
+    
     // Build Swagger document (same as in main.ts)
     // Note: Swagger generation doesn't require a database connection
     // It only needs controller metadata and DTOs
@@ -146,47 +102,21 @@ async function generateOpenAPI() {
       .addTag('buildings')
       .build();
     
+    // Generate OpenAPI document
+    // This should work even if TypeORM connection failed
+    // Try to generate even if app.init() failed
     let document;
     try {
       document = SwaggerModule.createDocument(app, config);
     } catch (swaggerError: any) {
-      // If Swagger generation fails due to database connection, 
-      // it's likely because TypeORM is trying to connect during introspection
-      // Swagger doesn't actually need the database - it only needs controller metadata
-      if (swaggerError?.message?.includes('connect') || 
-          swaggerError?.message?.includes('ECONNREFUSED') ||
-          swaggerError?.code === 'ECONNREFUSED' ||
-          swaggerError?.name === 'AggregateError') {
-        console.log('⚠️  Swagger generation encountered DB connection issue (expected), continuing anyway...');
-        // Try to create a minimal document - Swagger doesn't need DB connection
-        // Wait a bit for any async operations to complete
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        try {
-          document = SwaggerModule.createDocument(app, config);
-        } catch (retryError: any) {
-          // If it still fails, log but try to continue
-          console.log('⚠️  Swagger generation still failing, but this is expected without DB connection');
-          // Check if it's a connection error (including AggregateError)
-          const isRetryConnectionError = 
-            retryError?.message?.includes('connect') || 
-            retryError?.message?.includes('ECONNREFUSED') ||
-            retryError?.code === 'ECONNREFUSED' ||
-            retryError?.name === 'AggregateError' ||
-            (retryError?.errors && Array.isArray(retryError.errors) && 
-             retryError.errors.some((e: any) => e?.code === 'ECONNREFUSED'));
-          
-          if (isRetryConnectionError) {
-            console.log('⚠️  Swagger generation still failing due to DB connection (expected), trying one more time...');
-            // Wait longer and try one more time
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            document = SwaggerModule.createDocument(app, config);
-          } else {
-            throw retryError;
-          }
-        }
-      } else {
+      // If Swagger generation fails, check if it's because app wasn't initialized
+      if (!initSucceeded) {
+        console.error('❌ Error: Unable to generate Swagger document because app initialization failed.');
+        console.error('   Swagger generation requires the app to be initialized.');
+        console.error('   Please ensure TypeORM can be skipped during OpenAPI generation.');
         throw swaggerError;
       }
+      throw swaggerError;
     }
     
     // Write to openapi.json in service root
@@ -201,33 +131,28 @@ async function generateOpenAPI() {
     delete process.env.SKIP_DB_CONNECTION;
     delete process.env.GENERATE_OPENAPI;
     
-    // Remove rejection handler
-    process.removeListener('unhandledRejection', rejectionHandler);
-    
     process.exit(0);
   } catch (error: any) {
-    // Remove rejection handler
-    process.removeListener('unhandledRejection', rejectionHandler);
-    // Check if it's a connection error that we can ignore
+    // Check if it's a connection error - if so, provide clear guidance
     const isConnectionError = 
       error?.message?.includes('connect') || 
       error?.message?.includes('ECONNREFUSED') ||
+      error?.message?.includes('timeout') ||
+      error?.message?.includes('Connection terminated') ||
       error?.code === 'ECONNREFUSED' ||
       error?.code === 'ENOTFOUND' ||
-      error?.name === 'ConnectionError' ||
-      error?.name === 'AggregateError' ||
-      (error?.errors && Array.isArray(error.errors) && 
-      error.errors.some((e: any) => 
-        e?.code === 'ECONNREFUSED' || 
-        e?.message?.includes('connect') ||
-        e?.message?.includes('ECONNREFUSED')
-      ));
+      error?.code === 'ETIMEDOUT' ||
+      error?.name === 'ConnectionError';
     
     if (isConnectionError) {
-      console.error('❌ Error generating OpenAPI spec: Database connection failed');
-      console.error('This is expected when generating OpenAPI without a database connection.');
-      console.error('However, Swagger generation should not require a database.');
-      console.error('Please check that TypeORM is properly configured to skip connection during OpenAPI generation.');
+      console.error('❌ Error: OpenAPI generation requires no database connection.');
+      console.error('   TypeORM is attempting to connect during app initialization.');
+      console.error('   This indicates a misconfiguration - OpenAPI generation should not require a DB.');
+      console.error('');
+      console.error('   Please ensure:');
+      console.error('   1. TypeORM connection is properly configured to skip during generation');
+      console.error('   2. AppModule does not eagerly initialize database connections');
+      console.error('   3. No services are trying to connect during module initialization');
       process.exit(1);
     } else {
       console.error('❌ Error generating OpenAPI spec:', error);
@@ -241,4 +166,3 @@ async function generateOpenAPI() {
 }
 
 generateOpenAPI();
-

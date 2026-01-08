@@ -33,14 +33,17 @@ const skipDatabaseConnection = process.env.SKIP_DB_CONNECTION === 'true' || proc
           // Set retry attempts to 0 to fail immediately
           config.retryAttempts = 0;
           config.retryDelay = 0;
-          // Set a very short timeout to fail quickly
-          config.connectTimeoutMS = 1;
+          // Set a very short timeout to fail quickly (1ms)
+          const timeout = parseInt(process.env.DB_CONNECTION_TIMEOUT || '1', 10);
+          config.connectTimeoutMS = timeout;
+          config.extra = {
+            connectionTimeoutMillis: timeout,
+            query_timeout: timeout,
+          };
           // Use autoLoadEntities: false to prevent eager connection
           config.autoLoadEntities = false;
-          config.extra = {
-            connectionTimeoutMillis: 1,
-            query_timeout: 1,
-          };
+          // Set connection to be lazy - don't connect until first use
+          // Note: This doesn't prevent connection, but helps with timing
         }
         
         return config;

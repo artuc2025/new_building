@@ -1,0 +1,200 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import * as request from 'supertest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import SwaggerParser from '@apidevtools/swagger-parser';
+import { BuildingsModule } from '../../src/buildings/buildings.module';
+import { SwaggerModule } from '../../src/swagger/swagger.module';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase } from '../utils/test-db';
+import { createTestDeveloper, createTestRegion, createTestBuilding } from '../utils/fixtures';
+import { DataSource } from 'typeorm';
+
+describe('API Contract Tests (listings-service)', () => {
+  let app: INestApplication;
+  let ajv: Ajv;
+  let openApiSpec: any;
+  let dataSource: DataSource;
+
+  beforeAll(async () => {
+    // Setup test database
+    dataSource = await setupTestDatabase();
+
+    // Load OpenAPI spec from generated file
+    const specPath = join(__dirname, '../../openapi.json');
+    try {
+      const specContent = readFileSync(specPath, 'utf-8');
+      openApiSpec = await SwaggerParser.dereference(JSON.parse(specContent));
+    } catch (error) {
+      throw new Error(`Failed to load OpenAPI spec from ${specPath}. Run 'pnpm nx run listings-service:openapi:generate' first.`);
+    }
+
+    // Setup Ajv for schema validation
+    ajv = new Ajv({ allErrors: true, strict: false });
+    addFormats(ajv);
+
+    // Create NestJS app with test database connection
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+        }),
+        TypeOrmModule.forRoot({
+          type: 'postgres',
+          host: dataSource.options.host as string,
+          port: dataSource.options.port as number,
+          username: dataSource.options.username as string,
+          password: dataSource.options.password as string,
+          database: dataSource.options.database as string,
+          schema: 'listings',
+          synchronize: false,
+          logging: false,
+          entities: [__dirname + '/../../src/**/*.entity{.ts,.js}'],
+          migrations: [__dirname + '/../../src/migrations/*{.ts,.js}'],
+          migrationsTableName: 'typeorm_migrations',
+          migrationsRun: false,
+        }),
+        BuildingsModule,
+        SwaggerModule,
+      ],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+      }),
+    );
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await teardownTestDatabase();
+  });
+
+  beforeEach(async () => {
+    await clearDatabase(dataSource);
+  });
+
+  // Helper to validate response against OpenAPI schema
+  const validateResponse = (statusCode: number, responseBody: any, path: string, method: string) => {
+    const pathObj = openApiSpec.paths[path];
+    if (!pathObj) {
+      throw new Error(`No OpenAPI spec found for path: ${path}`);
+    }
+
+    const operation = pathObj[method.toLowerCase()];
+    if (!operation) {
+      throw new Error(`No OpenAPI spec found for ${method} ${path}`);
+    }
+
+    const responseSchema = operation.responses?.[statusCode]?.content?.['application/json']?.schema;
+    if (!responseSchema) {
+      // Some responses might not have schemas defined (e.g., 404)
+      return;
+    }
+
+    const validate = ajv.compile(responseSchema);
+    const valid = validate(responseBody);
+    if (!valid) {
+      console.error('Contract validation errors:', validate.errors);
+      console.error('Response body:', JSON.stringify(responseBody, null, 2));
+    }
+    expect(valid).toBe(true);
+  };
+
+  describe('GET /v1/buildings', () => {
+    it('should match OpenAPI schema for 200 response', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      await createTestBuilding(dataSource, developer.id, region.id, { status: 'published' });
+
+      const response = await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ page: 1, limit: 10 })
+        .expect(200);
+
+      // Validate response envelope shape
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('pagination');
+      expect(response.body).toHaveProperty('meta');
+      expect(Array.isArray(response.body.data)).toBe(true);
+
+      // Validate against OpenAPI schema
+      validateResponse(200, response.body, '/v1/buildings', 'GET');
+    });
+
+    it('should return 400 for invalid query parameters and validate error schema', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ page: -1, limit: 200 })
+        .expect(400);
+
+      // Validate error envelope shape
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
+      expect(response.body.error).toHaveProperty('message');
+      expect(response.body.error).toHaveProperty('requestId');
+      expect(response.body.error).toHaveProperty('statusCode');
+    });
+  });
+
+  describe('GET /v1/buildings/:id', () => {
+    it('should match OpenAPI schema for 200 response', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      const building = await createTestBuilding(dataSource, developer.id, region.id);
+
+      const response = await request(app.getHttpServer())
+        .get(`/v1/buildings/${building.id}`)
+        .expect(200);
+
+      // Validate response envelope shape
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data.id).toBe(building.id);
+
+      // Validate against OpenAPI schema
+      validateResponse(200, response.body, '/v1/buildings/{id}', 'GET');
+    });
+
+    it('should return 404 for non-existent building and validate error schema', async () => {
+      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      const response = await request(app.getHttpServer())
+        .get(`/v1/buildings/${nonExistentId}`)
+        .expect(404);
+
+      // Validate error envelope shape
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
+      expect(response.body.error).toHaveProperty('message');
+      expect(response.body.error).toHaveProperty('requestId');
+      expect(response.body.error).toHaveProperty('statusCode');
+      expect(response.body.error.statusCode).toBe(404);
+    });
+
+    it('should return 400 for invalid UUID format', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/v1/buildings/invalid-uuid')
+        .expect(400);
+
+      // Validate error envelope shape
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
+      expect(response.body.error).toHaveProperty('message');
+      expect(response.body.error).toHaveProperty('requestId');
+      expect(response.body.error).toHaveProperty('statusCode');
+    });
+  });
+});
+
