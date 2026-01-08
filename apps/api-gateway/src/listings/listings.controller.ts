@@ -14,8 +14,8 @@ import {
   HttpException,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
-import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto } from '@new-building-portal/contracts';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader, ApiOkResponse, ApiCreatedResponse, ApiExtraModels } from '@nestjs/swagger';
+import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto } from '@new-building-portal/contracts';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -24,6 +24,7 @@ import { AxiosError } from 'axios';
 import { AdminGuard } from '../common/guards/admin.guard';
 
 @ApiTags('buildings')
+@ApiExtraModels(PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto)
 @Controller('api/v1/buildings')
 export class ListingsController {
   constructor(
@@ -271,6 +272,7 @@ export class ListingsController {
 }
 
 @ApiTags('admin-buildings')
+@ApiExtraModels(PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto)
 @Controller('api/v1/admin/buildings')
 @UseGuards(AdminGuard)
 export class AdminListingsController {
@@ -504,7 +506,14 @@ export class AdminListingsController {
       additionalProperties: true,
     },
   })
-  @ApiOkResponse({ type: BuildingEnvelopeDto, description: 'Building updated successfully' })
+  @ApiOkResponse({
+    description: 'Building updated successfully',
+    content: {
+      'application/json': {
+        schema: { $ref: getSchemaPath(BuildingEnvelopeDto) },
+      },
+    },
+  })
   @ApiResponse({ status: 400, description: 'Invalid input data or UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 404, description: 'Building not found' })

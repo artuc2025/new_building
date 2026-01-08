@@ -48,7 +48,9 @@ async function bootstrap() {
       'admin-key',
     )
     .build();
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, config, {
+    extraModels: [],
+  });
   SwaggerModule.setup('api/docs', app, document);
 
   // Store document in service for /api-docs-json endpoint

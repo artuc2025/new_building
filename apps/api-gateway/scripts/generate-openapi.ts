@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { NestFactory } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
@@ -17,27 +17,35 @@ async function generateOpenAPI() {
     // Disable logging to reduce noise
     process.env.NODE_ENV = 'production';
     
-    // Create NestJS app instance
-    // Note: NestFactory.create() already initializes the app
-    let app;
+    // Create testing module to properly initialize NestJS context
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    
+    // Create NestJS app from testing module
+    const app = moduleRef.createNestApplication();
+    
+    // Initialize app
+    let initSucceeded = false;
     try {
-      app = await NestFactory.create(AppModule, { 
-        logger: false,
-        abortOnError: false, // Don't abort on errors during generation
-      });
-    } catch (createError: any) {
-      // If it's a connection error during creation, that's expected
-      if (createError?.message?.includes('connect') || 
-          createError?.message?.includes('ECONNREFUSED') ||
-          createError?.code === 'ECONNREFUSED' ||
-          createError?.code === 'ENOTFOUND') {
-        console.log('⚠️  External service connections failed (expected for generation), retrying...');
-        app = await NestFactory.create(AppModule, { 
-          logger: false,
-          abortOnError: false,
-        });
+      await app.init();
+      initSucceeded = true;
+    } catch (initError: any) {
+      // Check if it's a connection error (expected for generation)
+      const isConnectionError = 
+        initError?.message?.includes('connect') || 
+        initError?.message?.includes('ECONNREFUSED') ||
+        initError?.message?.includes('timeout') ||
+        initError?.code === 'ECONNREFUSED' ||
+        initError?.code === 'ENOTFOUND' ||
+        initError?.code === 'ETIMEDOUT';
+      
+      if (isConnectionError) {
+        console.warn('⚠️  External service connections failed (expected for OpenAPI generation)');
+        console.warn('   Continuing with Swagger generation...');
+        initSucceeded = false;
       } else {
-        throw createError;
+        throw initError;
       }
     }
     
@@ -72,6 +80,7 @@ async function generateOpenAPI() {
     const document = SwaggerModule.createDocument(app, config, {
       ignoreGlobalPrefix: false,
       deepScanRoutes: true,
+      extraModels: [],
     });
     
     // Write to openapi.json in service root
