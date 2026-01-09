@@ -87,8 +87,8 @@ describe('BuildingsController (Contract Tests)', () => {
         orderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getCount: jest.fn().resolves(1),
-        getMany: jest.fn().resolves([mockBuilding]),
+        getCount: jest.fn().mockResolvedValue(1),
+        getMany: jest.fn().mockResolvedValue([mockBuilding]),
       };
 
       mockRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
@@ -158,12 +158,12 @@ describe('BuildingsController (Contract Tests)', () => {
       const createDto: CreateBuildingDto = {
         title: { en: 'New Building' },
         address: { en: 'New Address' },
-        location: { longitude: 44.5091, latitude: 40.1811 },
+        location: { lng: 44.5091, lat: 40.1811 },
         floors: 5,
-        area_min: 60,
-        area_max: 120,
-        developer_id: 'dev-1',
-        region_id: 'region-1',
+        areaMin: 60,
+        areaMax: 120,
+        developerId: 'dev-1',
+        regionId: 'region-1',
       };
 
       mockRepository.create.mockReturnValue(mockBuilding);

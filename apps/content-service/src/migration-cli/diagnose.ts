@@ -22,7 +22,7 @@ AppDataSource.initialize()
     const options = AppDataSource.options;
     console.log(`\nEntity globs: ${Array.isArray(options.entities) ? options.entities.join(', ') : 'N/A'}`);
     console.log(`Migration globs: ${Array.isArray(options.migrations) ? options.migrations.join(', ') : 'N/A'}`);
-    console.log(`Schema: ${options.schema || 'default'}`);
+    console.log(`Schema: ${(options as any).schema || 'default'}`);
 
     await AppDataSource.destroy();
     console.log('\n✅ Diagnostics completed');
