@@ -1,3 +1,5 @@
+import { DocumentBuilder, SwaggerModule as NestSwaggerModule } from '@nestjs/swagger';
+import { SwaggerDocument } from '../../src/swagger/swagger.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -7,7 +9,9 @@ import { BuildingsModule } from '../../src/buildings/buildings.module';
 import { SwaggerModule } from '../../src/swagger/swagger.module';
 import { setupTestDatabase, teardownTestDatabase, clearDatabase } from '../utils/test-db';
 import { createTestDeveloper, createTestRegion, createTestBuilding } from '../utils/fixtures';
+import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { DataSource } from 'typeorm';
+import { BuildingStatus } from '@new-building-portal/contracts';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import SwaggerParser from '@apidevtools/swagger-parser';
@@ -30,11 +34,11 @@ describe('Buildings API Integration Tests (listings-service)', () => {
         }),
         TypeOrmModule.forRoot({
           type: 'postgres',
-          host: dataSource.options.host as string,
-          port: dataSource.options.port as number,
-          username: dataSource.options.username as string,
-          password: dataSource.options.password as string,
-          database: dataSource.options.database as string,
+          host: (dataSource.options as any).host as string,
+          port: (dataSource.options as any).port as number,
+          username: (dataSource.options as any).username as string,
+          password: (dataSource.options as any).password as string,
+          database: (dataSource.options as any).database as string,
           schema: 'listings',
           synchronize: false,
           logging: false,
@@ -59,10 +63,25 @@ describe('Buildings API Integration Tests (listings-service)', () => {
         },
       }),
     );
+    app.useGlobalFilters(new HttpExceptionFilter());
+
+    // Setup Swagger
+    const config = new DocumentBuilder()
+      .setTitle('Test API')
+      .setVersion('1.0')
+      .build();
+    const document = NestSwaggerModule.createDocument(app, config);
+    const swaggerService = app.get(SwaggerDocument);
+    swaggerService.setDocument(document);
+
     await app.init();
 
     // Setup Ajv for contract validation
-    ajv = new Ajv({ allErrors: true, strict: false });
+    ajv = new Ajv({ 
+      allErrors: true, 
+      strict: false,
+      coerceTypes: true
+    });
     addFormats(ajv);
 
     // Load OpenAPI spec from running app
@@ -109,7 +128,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
     it('should return paginated list of buildings (happy path)', async () => {
       const developer = await createTestDeveloper(dataSource);
       const region = await createTestRegion(dataSource);
-      await createTestBuilding(dataSource, developer.id, region.id, { status: 'published' });
+      await createTestBuilding(dataSource, developer.id, region.id, { status: BuildingStatus.PUBLISHED });
 
       const response = await request(app.getHttpServer())
         .get('/v1/buildings')
@@ -155,7 +174,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
     });
 
     it('should return 404 when building not found', async () => {
-      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      const nonExistentId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d'; // Valid v4 UUID
       await request(app.getHttpServer())
         .get(`/v1/buildings/${nonExistentId}`)
         .expect(404);
@@ -181,12 +200,12 @@ describe('Buildings API Integration Tests (listings-service)', () => {
         title: { en: 'New Building', am: 'Նոր Շենք', ru: 'Новое Здание' },
         description: { en: 'New building description' },
         address: { en: 'New Address 456', am: 'Նոր Հասցե 456', ru: 'Новый Адрес 456' },
-        location: { longitude: 44.5091, latitude: 40.1811 },
+        location: { lng: 44.5091, lat: 40.1811 },
         floors: 5,
-        area_min: 60,
-        area_max: 120,
-        developer_id: developer.id,
-        region_id: region.id,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: developer.id,
+        regionId: region.id,
         status: 'draft',
       };
 
@@ -383,7 +402,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
     });
 
     it('should return 404 when building not found', async () => {
-      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      const nonExistentId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d'; // Valid v4 UUID
 
       await request(app.getHttpServer())
         .delete(`/v1/buildings/${nonExistentId}`)

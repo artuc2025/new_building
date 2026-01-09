@@ -12,7 +12,9 @@ import { BuildingsModule } from '../../src/buildings/buildings.module';
 import { SwaggerModule } from '../../src/swagger/swagger.module';
 import { setupTestDatabase, teardownTestDatabase, clearDatabase } from '../utils/test-db';
 import { createTestDeveloper, createTestRegion, createTestBuilding } from '../utils/fixtures';
+import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { DataSource } from 'typeorm';
+import { BuildingStatus } from '@new-building-portal/contracts';
 
 // Sprint 2 endpoints that MUST have response schemas for 200/201
 const SPRINT_2_ENDPOINTS = [
@@ -44,7 +46,11 @@ describe('API Contract Tests (listings-service)', () => {
     }
 
     // Setup Ajv for schema validation
-    ajv = new Ajv({ allErrors: true, strict: false });
+    ajv = new Ajv({ 
+      allErrors: true, 
+      strict: false,
+      coerceTypes: true
+    });
     addFormats(ajv);
 
     // Create NestJS app with test database connection
@@ -55,11 +61,11 @@ describe('API Contract Tests (listings-service)', () => {
         }),
         TypeOrmModule.forRoot({
           type: 'postgres',
-          host: dataSource.options.host as string,
-          port: dataSource.options.port as number,
-          username: dataSource.options.username as string,
-          password: dataSource.options.password as string,
-          database: dataSource.options.database as string,
+          host: (dataSource.options as any).host as string,
+          port: (dataSource.options as any).port as number,
+          username: (dataSource.options as any).username as string,
+          password: (dataSource.options as any).password as string,
+          database: (dataSource.options as any).database as string,
           schema: 'listings',
           synchronize: false,
           logging: false,
@@ -84,6 +90,7 @@ describe('API Contract Tests (listings-service)', () => {
         },
       }),
     );
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
   });
 
@@ -142,7 +149,7 @@ describe('API Contract Tests (listings-service)', () => {
     it('should match OpenAPI schema for 200 response', async () => {
       const developer = await createTestDeveloper(dataSource);
       const region = await createTestRegion(dataSource);
-      await createTestBuilding(dataSource, developer.id, region.id, { status: 'published' });
+      await createTestBuilding(dataSource, developer.id, region.id, { status: BuildingStatus.PUBLISHED });
 
       const response = await request(app.getHttpServer())
         .get('/v1/buildings')
@@ -194,7 +201,7 @@ describe('API Contract Tests (listings-service)', () => {
     });
 
     it('should return 404 for non-existent building and validate error schema', async () => {
-      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      const nonExistentId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d'; // Valid v4 UUID
       const response = await request(app.getHttpServer())
         .get(`/v1/buildings/${nonExistentId}`)
         .expect(404);

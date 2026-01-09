@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, Raw } from 'typeorm';
 import { Building } from '../entities/building.entity';
 import { PricingSnapshot } from '../entities/pricing-snapshot.entity';
 import { BuildingStatus } from '@new-building-portal/contracts';
@@ -151,16 +151,32 @@ export class BuildingsService {
       // TypeORM geography column expects WKT format: 'POINT(lng lat)'
       const lng = createDto.location.lng;
       const lat = createDto.location.lat;
-      buildingData.location = `POINT(${lng} ${lat})`;
+      buildingData.location = Raw(() => `ST_GeomFromText('POINT(${lng} ${lat})', 4326)`);
     }
 
-    const building = this.buildingsRepository.create(buildingData);
-    const saved = await this.buildingsRepository.save(building);
-    // Admin operations should use admin view (isAdmin=true) to see drafts
-    // save() returns Building | Building[], but we pass a single entity so it's Building
-    const savedBuilding = Array.isArray(saved) ? saved[0] : saved;
+    // Use Raw SQL to insert to avoid "unknown GeoJSON type" error with TypeORM/pg
+    // Prepare columns and values
+    delete buildingData.location; // Handle location manually
+    
+    const columns = Object.keys(buildingData);
+    const values = columns.map(col => buildingData[col]);
+    const placeholders = values.map((_, i) => `$${i + 1}`);
+    
+    let locationVal = 'DEFAULT';
+    if (createDto.location) {
+      locationVal = `ST_SetSRID(ST_MakePoint(${createDto.location.lng}, ${createDto.location.lat}), 4326)`;
+    }
+
+    const sql = `
+      INSERT INTO listings.buildings (${columns.join(', ')}, location)
+      VALUES (${placeholders.join(', ')}, ${locationVal})
+      RETURNING id
+    `;
+
+    const result = await this.buildingsRepository.query(sql, values);
+    const savedId = result[0].id;
     const currency = createDto.currency || 'AMD';
-    return this.findOne(savedBuilding.id, currency, true);
+    return this.findOne(savedId, currency, true);
   }
 
   async update(id: string, updateDto: UpdateBuildingDto): Promise<BuildingResponseDto> {
@@ -229,10 +245,33 @@ export class BuildingsService {
     if (updateDto.location) {
       const lng = updateDto.location.lng;
       const lat = updateDto.location.lat;
-      updateData.location = `POINT(${lng} ${lat})`;
+      updateData.location = Raw(() => `ST_GeomFromText('POINT(${lng} ${lat})', 4326)`);
     }
 
-    await this.buildingsRepository.update(id, updateData);
+    // Use Raw SQL to update
+    delete updateData.location;
+    
+    const columns = Object.keys(updateData);
+    if (columns.length > 0 || updateDto.location) {
+      const values = columns.map(col => updateData[col]);
+      const setClauses = columns.map((col, i) => `${col} = $${i + 1}`);
+      
+      if (updateDto.location) {
+        setClauses.push(`location = ST_SetSRID(ST_MakePoint(${updateDto.location.lng}, ${updateDto.location.lat}), 4326)`);
+      }
+      
+      // Add ID as last parameter
+      values.push(id);
+      
+      const sql = `
+        UPDATE listings.buildings
+        SET ${setClauses.join(', ')}
+        WHERE id = $${values.length}
+      `;
+      
+      await this.buildingsRepository.query(sql, values);
+    }
+
     // Admin operations should use admin view (isAdmin=true) to see drafts/archived
     const currency = updateDto.currency || building.currency || 'AMD';
     return this.findOne(id, currency, true);
@@ -355,14 +394,14 @@ export class BuildingsService {
       description: building.description,
       address: building.address,
       location,
-      addressLine1: building.address_line_1,
-      addressLine2: building.address_line_2,
+      addressLine1: building.address_line_1 || undefined,
+      addressLine2: building.address_line_2 || undefined,
       city: building.city,
-      postalCode: building.postal_code,
+      postalCode: building.postal_code || undefined,
       floors: building.floors,
-      totalUnits: building.total_units,
+      totalUnits: building.total_units || undefined,
       commissioningDate: building.commissioning_date ? (building.commissioning_date instanceof Date ? building.commissioning_date.toISOString().split('T')[0] : building.commissioning_date) : undefined,
-      constructionStatus: building.construction_status,
+      constructionStatus: building.construction_status || undefined,
       pricePerM2Min: building.price_per_m2_min ? Number(building.price_per_m2_min) : undefined,
       pricePerM2Max: building.price_per_m2_max ? Number(building.price_per_m2_max) : undefined,
       areaMin: Number(building.area_min),
@@ -371,14 +410,14 @@ export class BuildingsService {
       developerId: building.developer_id,
       regionId: building.region_id,
       status: building.status,
-      isFeatured: building.is_featured,
-      developerWebsiteUrl: building.developer_website_url,
-      developerFacebookUrl: building.developer_facebook_url,
-      developerInstagramUrl: building.developer_instagram_url,
+      isFeatured: building.is_featured || false,
+      developerWebsiteUrl: building.developer_website_url || undefined,
+      developerFacebookUrl: building.developer_facebook_url || undefined,
+      developerInstagramUrl: building.developer_instagram_url || undefined,
       createdAt: building.created_at ? (building.created_at instanceof Date ? building.created_at.toISOString() : building.created_at) : undefined,
       updatedAt: building.updated_at ? (building.updated_at instanceof Date ? building.updated_at.toISOString() : building.updated_at) : undefined,
       publishedAt: building.published_at ? (building.published_at instanceof Date ? building.published_at.toISOString() : building.published_at) : undefined,
-      createdBy: building.created_by,
+      createdBy: building.created_by || undefined,
     } as BuildingResponseDto;
   }
 }

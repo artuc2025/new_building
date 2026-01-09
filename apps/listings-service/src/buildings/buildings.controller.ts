@@ -112,7 +112,23 @@ export class BuildingsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete a building (admin only)' })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
-  @ApiResponse({ status: 200, description: 'Building deleted successfully' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Building deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            status: { type: 'string' },
+            deletedAt: { type: 'string', format: 'date-time' }
+          }
+        }
+      }
+    }
+  })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin token required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
