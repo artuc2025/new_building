@@ -1,404 +1,181 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/api-docs-json": {
-      "get": {
-        "operationId": "SwaggerController_getSwaggerJson",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/healthz/live": {
-      "get": {
-        "operationId": "HealthController_getLive",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/healthz/ready": {
-      "get": {
-        "operationId": "HealthController_getReady",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "The Health Check is successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "ok"
-                    },
-                    "info": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "error": {
-                      "type": "object",
-                      "example": {},
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "details": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The Health Check is not successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "error"
-                    },
-                    "info": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "error": {
-                      "type": "object",
-                      "example": {
-                        "redis": {
-                          "status": "down",
-                          "message": "Could not connect"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "details": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        },
-                        "redis": {
-                          "status": "down",
-                          "message": "Could not connect"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/health": {
-      "get": {
-        "operationId": "HealthController_getHealth",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "The Health Check is successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "ok"
-                    },
-                    "info": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "error": {
-                      "type": "object",
-                      "example": {},
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "details": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The Health Check is not successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "error"
-                    },
-                    "info": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "error": {
-                      "type": "object",
-                      "example": {
-                        "redis": {
-                          "status": "down",
-                          "message": "Could not connect"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      },
-                      "nullable": true
-                    },
-                    "details": {
-                      "type": "object",
-                      "example": {
-                        "database": {
-                          "status": "up"
-                        },
-                        "redis": {
-                          "status": "down",
-                          "message": "Could not connect"
-                        }
-                      },
-                      "additionalProperties": {
-                        "type": "object",
-                        "required": [
-                          "status"
-                        ],
-                        "properties": {
-                          "status": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/buildings": {
       "get": {
-        "tags": ["buildings"],
-        "summary": "Get paginated list of buildings (public)",
         "operationId": "ListingsController_findAll",
+        "summary": "Get paginated list of buildings (public)",
         "parameters": [
           {
-            "name": "page",
-            "in": "query",
+            "name": "status",
             "required": false,
+            "in": "query",
+            "description": "Status filter (public endpoints only expose published buildings). Defaults to \"published\".",
             "schema": {
-              "type": "number"
-            },
-            "description": "Page number"
+              "enum": [
+                "published"
+              ],
+              "type": "string"
+            }
           },
           {
-            "name": "limit",
-            "in": "query",
+            "name": "bbox",
             "required": false,
-            "schema": {
-              "type": "number"
-            },
-            "description": "Items per page"
-          },
-          {
-            "name": "search",
             "in": "query",
-            "required": false,
+            "description": "Bounding box filter: \"minLng,minLat,maxLng,maxLat\"",
             "schema": {
               "type": "string"
-            },
-            "description": "Search query"
+            }
+          },
+          {
+            "name": "commissioning_date_to",
+            "required": false,
+            "in": "query",
+            "description": "Commissioning date to (ISO 8601 date string)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commissioning_date_from",
+            "required": false,
+            "in": "query",
+            "description": "Commissioning date from (ISO 8601 date string)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "developer_id",
+            "required": false,
+            "in": "query",
+            "description": "Developer ID (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "region_id",
+            "required": false,
+            "in": "query",
+            "description": "Region ID (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "floors_max",
+            "required": false,
+            "in": "query",
+            "description": "Maximum number of floors",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "floors_min",
+            "required": false,
+            "in": "query",
+            "description": "Minimum number of floors",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "area_max",
+            "required": false,
+            "in": "query",
+            "description": "Maximum area (m²)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "area_min",
+            "required": false,
+            "in": "query",
+            "description": "Minimum area (m²)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "price_max",
+            "required": false,
+            "in": "query",
+            "description": "Maximum price per m² (in selected currency)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "price_min",
+            "required": false,
+            "in": "query",
+            "description": "Minimum price per m² (in selected currency)",
+            "schema": {
+              "type": "number"
+            }
           },
           {
             "name": "currency",
-            "in": "query",
             "required": false,
+            "in": "query",
+            "description": "Currency filter",
             "schema": {
+              "enum": [
+                "AMD",
+                "USD"
+              ],
               "type": "string"
-            },
-            "description": "Currency filter"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort option",
+            "schema": {
+              "enum": [
+                "price_asc",
+                "price_desc",
+                "date_desc",
+                "date_asc",
+                "area_asc",
+                "area_desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Items per page",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "List of buildings retrieved successfully"
+            "description": "List of buildings retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedBuildingsResponseDto"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid query parameters"
@@ -406,136 +183,28 @@
           "503": {
             "description": "Service unavailable"
           }
-        }
-      }
-    },
-    "/api/v1/buildings/{id}": {
-      "get": {
-        "tags": ["buildings"],
-        "summary": "Get building by ID (public)",
-        "operationId": "ListingsController_findOne",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Building ID (UUID)"
-          },
-          {
-            "name": "currency",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Currency for price conversion"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Building retrieved successfully"
-          },
-          "400": {
-            "description": "Invalid UUID format"
-          },
-          "404": {
-            "description": "Building not found"
-          },
-          "503": {
-            "description": "Service unavailable"
-          }
-        }
-      }
-    },
-    "/api/v1/admin/buildings": {
-      "get": {
-        "tags": ["admin-buildings"],
-        "summary": "Get paginated list of buildings (admin)",
-        "operationId": "AdminListingsController_findAll",
-        "security": [
-          {
-            "admin-key": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "x-admin-key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Admin API key"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number"
-            },
-            "description": "Page number"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number"
-            },
-            "description": "Items per page"
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Search query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of buildings retrieved successfully"
-          },
-          "400": {
-            "description": "Invalid query parameters"
-          },
-          "401": {
-            "description": "Unauthorized - admin key required"
-          },
-          "503": {
-            "description": "Service unavailable"
-          }
-        }
+        },
+        "tags": [
+          "buildings"
+        ]
       },
       "post": {
-        "tags": ["admin-buildings"],
-        "summary": "Create a new building (admin)",
-        "operationId": "AdminListingsController_create",
-        "security": [
-          {
-            "admin-key": []
-          }
-        ],
+        "operationId": "ListingsController_create",
+        "summary": "Create a new building (admin only)",
         "parameters": [
           {
             "name": "x-admin-key",
             "in": "header",
+            "description": "Admin API key",
             "required": true,
             "schema": {
               "type": "string"
-            },
-            "description": "Admin API key"
+            }
           }
         ],
         "requestBody": {
-          "description": "Building data",
           "required": true,
+          "description": "Building data",
           "content": {
             "application/json": {
               "schema": {
@@ -547,7 +216,14 @@
         },
         "responses": {
           "201": {
-            "description": "Building created successfully"
+            "description": "Building created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingEnvelopeDto"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid input data"
@@ -558,48 +234,49 @@
           "503": {
             "description": "Service unavailable"
           }
-        }
+        },
+        "tags": [
+          "buildings"
+        ]
       }
     },
-    "/api/v1/admin/buildings/{id}": {
+    "/api/v1/buildings/{id}": {
       "get": {
-        "tags": ["admin-buildings"],
-        "summary": "Get building by ID (admin)",
-        "operationId": "AdminListingsController_findOne",
-        "security": [
-          {
-            "admin-key": []
-          }
-        ],
+        "operationId": "ListingsController_findOne",
+        "summary": "Get building by ID (public)",
         "parameters": [
           {
-            "name": "x-admin-key",
-            "in": "header",
+            "name": "id",
             "required": true,
+            "in": "path",
+            "description": "Building ID (UUID)",
             "schema": {
               "type": "string"
-            },
-            "description": "Admin API key"
+            }
           },
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "Currency for price conversion",
             "schema": {
               "type": "string"
-            },
-            "description": "Building ID (UUID)"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Building retrieved successfully"
+            "description": "Building retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingEnvelopeDto"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid UUID format"
-          },
-          "401": {
-            "description": "Unauthorized - admin key required"
           },
           "404": {
             "description": "Building not found"
@@ -607,40 +284,37 @@
           "503": {
             "description": "Service unavailable"
           }
-        }
+        },
+        "tags": [
+          "buildings"
+        ]
       },
       "put": {
-        "tags": ["admin-buildings"],
-        "summary": "Update building by ID (admin)",
-        "operationId": "AdminListingsController_update",
-        "security": [
-          {
-            "admin-key": []
-          }
-        ],
+        "operationId": "ListingsController_update",
+        "summary": "Update building by ID (admin only)",
         "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Building ID (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "x-admin-key",
             "in": "header",
+            "description": "Admin API key",
             "required": true,
             "schema": {
               "type": "string"
-            },
-            "description": "Admin API key"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Building ID (UUID)"
+            }
           }
         ],
         "requestBody": {
-          "description": "Updated building data",
           "required": true,
+          "description": "Updated building data",
           "content": {
             "application/json": {
               "schema": {
@@ -652,7 +326,14 @@
         },
         "responses": {
           "200": {
-            "description": "Building updated successfully"
+            "description": "Building updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingEnvelopeDto"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid input data or UUID format"
@@ -666,40 +347,65 @@
           "503": {
             "description": "Service unavailable"
           }
-        }
+        },
+        "tags": [
+          "buildings"
+        ]
       },
       "delete": {
-        "tags": ["admin-buildings"],
-        "summary": "Delete building by ID (admin)",
-        "operationId": "AdminListingsController_remove",
-        "security": [
-          {
-            "admin-key": []
-          }
-        ],
+        "operationId": "ListingsController_remove",
+        "summary": "Delete building by ID (admin only)",
         "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Building ID (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "x-admin-key",
             "in": "header",
+            "description": "Admin API key",
             "required": true,
             "schema": {
               "type": "string"
-            },
-            "description": "Admin API key"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Building ID (UUID)"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Building deleted successfully"
+            "description": "Building deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "archived"
+                          ]
+                        },
+                        "deletedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid UUID format"
@@ -712,6 +418,20 @@
           },
           "503": {
             "description": "Service unavailable"
+          }
+        },
+        "tags": [
+          "buildings"
+        ]
+      }
+    },
+    "/api-docs-json": {
+      "get": {
+        "operationId": "SwaggerController_getSwaggerJson",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
           }
         }
       }
@@ -743,6 +463,273 @@
         "description": "Admin API key for admin endpoints"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "BuildingResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Building ID (UUID)"
+          },
+          "title": {
+            "type": "object",
+            "description": "Building title in multiple languages"
+          },
+          "description": {
+            "type": "object",
+            "description": "Building description in multiple languages"
+          },
+          "address": {
+            "type": "object",
+            "description": "Building address in multiple languages"
+          },
+          "location": {
+            "type": "object",
+            "description": "Geographic location",
+            "example": {
+              "lat": 40.1811,
+              "lng": 44.5144
+            }
+          },
+          "addressLine1": {
+            "type": "string",
+            "description": "Address line 1"
+          },
+          "addressLine2": {
+            "type": "string",
+            "description": "Address line 2"
+          },
+          "city": {
+            "type": "string",
+            "description": "City"
+          },
+          "postalCode": {
+            "type": "string",
+            "description": "Postal code"
+          },
+          "floors": {
+            "type": "number",
+            "description": "Number of floors"
+          },
+          "totalUnits": {
+            "type": "number",
+            "description": "Total units"
+          },
+          "commissioningDate": {
+            "type": "object",
+            "description": "Commissioning date"
+          },
+          "constructionStatus": {
+            "type": "string",
+            "description": "Construction status",
+            "enum": [
+              "planned",
+              "under_construction",
+              "completed"
+            ]
+          },
+          "pricePerM2Min": {
+            "type": "number",
+            "description": "Minimum price per m²"
+          },
+          "pricePerM2Max": {
+            "type": "number",
+            "description": "Maximum price per m²"
+          },
+          "areaMin": {
+            "type": "number",
+            "description": "Minimum area (m²)"
+          },
+          "areaMax": {
+            "type": "number",
+            "description": "Maximum area (m²)"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code"
+          },
+          "developerId": {
+            "type": "string",
+            "description": "Developer ID (UUID)"
+          },
+          "regionId": {
+            "type": "string",
+            "description": "Region ID (UUID)"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status",
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          "isFeatured": {
+            "type": "boolean",
+            "description": "Is featured"
+          },
+          "developerWebsiteUrl": {
+            "type": "string",
+            "description": "Developer website URL"
+          },
+          "developerFacebookUrl": {
+            "type": "string",
+            "description": "Developer Facebook URL"
+          },
+          "developerInstagramUrl": {
+            "type": "string",
+            "description": "Developer Instagram URL"
+          },
+          "createdAt": {
+            "type": "object",
+            "description": "Created at timestamp"
+          },
+          "updatedAt": {
+            "type": "object",
+            "description": "Updated at timestamp"
+          },
+          "publishedAt": {
+            "type": "object",
+            "description": "Published at timestamp"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Created by user ID (UUID)"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "address",
+          "location",
+          "city",
+          "floors",
+          "areaMin",
+          "areaMax",
+          "currency",
+          "developerId",
+          "regionId",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "Current page number (1-based)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Items per page"
+          },
+          "total": {
+            "type": "number",
+            "description": "Total number of items"
+          },
+          "totalPages": {
+            "type": "number",
+            "description": "Total number of pages"
+          },
+          "hasNext": {
+            "type": "boolean",
+            "description": "Whether there is a next page"
+          },
+          "hasPrev": {
+            "type": "boolean",
+            "description": "Whether there is a previous page"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "hasNext",
+          "hasPrev"
+        ]
+      },
+      "ResponseMetaDto": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Currency used for prices",
+            "enum": [
+              "AMD",
+              "USD"
+            ],
+            "example": "AMD"
+          },
+          "exchangeRate": {
+            "type": "number",
+            "description": "Exchange rate used for currency conversion",
+            "example": 1
+          },
+          "sort": {
+            "type": "string",
+            "description": "Sort option used",
+            "example": "date_desc"
+          }
+        },
+        "required": [
+          "currency",
+          "exchangeRate",
+          "sort"
+        ]
+      },
+      "PaginatedBuildingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "List of buildings",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildingResponseDto"
+            }
+          },
+          "pagination": {
+            "description": "Pagination metadata",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          },
+          "meta": {
+            "description": "Response metadata",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResponseMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "pagination",
+          "meta"
+        ]
+      },
+      "BuildingEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Building data",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BuildingResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    }
   }
 }
