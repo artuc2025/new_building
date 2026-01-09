@@ -15,6 +15,7 @@ import {
   IsArray,
 } from 'class-validator';
 import { Type, Transform, Expose } from 'class-transformer';
+import { BuildingStatus } from '@new-building-portal/contracts';
 
 class LocationDto {
   @ApiProperty({ description: 'Latitude', example: 40.1811 })
@@ -165,13 +166,13 @@ export class CreateBuildingDto {
 
   @ApiProperty({
     description: 'Status',
-    enum: ['draft', 'published', 'archived'],
-    default: 'draft',
+    enum: BuildingStatus,
+    default: BuildingStatus.DRAFT,
     required: false,
   })
   @IsOptional()
-  @IsEnum(['draft', 'published', 'archived'])
-  status?: 'draft' | 'published' | 'archived';
+  @IsEnum(BuildingStatus)
+  status?: BuildingStatus;
 
   @ApiProperty({ description: 'Is featured', default: false, required: false })
   @IsOptional()

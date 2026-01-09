@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { BuildingStatus } from './building-status.enum';
 
 export class BuildingResponseDto {
   @ApiProperty({ description: 'Building ID (UUID)' })
@@ -67,9 +68,9 @@ export class BuildingResponseDto {
 
   @ApiProperty({
     description: 'Status',
-    enum: ['draft', 'published', 'archived'],
+    enum: BuildingStatus,
   })
-  status: 'draft' | 'published' | 'archived';
+  status: BuildingStatus;
 
   @ApiProperty({ description: 'Is featured', required: false })
   isFeatured?: boolean;

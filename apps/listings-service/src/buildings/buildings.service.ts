@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Building } from '../entities/building.entity';
+import { PricingSnapshot } from '../entities/pricing-snapshot.entity';
+import { BuildingStatus } from '@new-building-portal/contracts';
 import {
   CreateBuildingDto,
   UpdateBuildingDto,
@@ -27,6 +29,8 @@ export class BuildingsService {
   constructor(
     @InjectRepository(Building)
     private buildingsRepository: Repository<Building>,
+    @InjectRepository(PricingSnapshot)
+    private pricingSnapshotRepository: Repository<PricingSnapshot>,
   ) {}
 
   async findAll(query: ListBuildingsQueryDto, isAdmin: boolean = false): Promise<PaginatedBuildingsResponseDto> {
@@ -36,7 +40,7 @@ export class BuildingsService {
     const currency = query.currency || 'AMD';
     const sort = query.sort || 'date_desc';
     // Public endpoints must only expose published buildings (enforce even if status is provided)
-    const status = isAdmin ? (query.status || 'all') : 'published';
+    const status = isAdmin ? (query.status || 'all') : BuildingStatus.PUBLISHED;
 
     // Validate sort enum
     if (!SORT_MAP[sort]) {
@@ -96,7 +100,7 @@ export class BuildingsService {
     
     // Public endpoints only see published buildings
     if (!isAdmin) {
-      where.status = 'published';
+      where.status = BuildingStatus.PUBLISHED;
     }
 
     const building = await this.buildingsRepository.findOne({
@@ -135,7 +139,7 @@ export class BuildingsService {
       currency: createDto.currency || 'AMD',
       developer_id: createDto.developerId,
       region_id: createDto.regionId,
-      status: createDto.status || 'draft',
+      status: createDto.status || BuildingStatus.DRAFT,
       is_featured: createDto.isFeatured || false,
       developer_website_url: createDto.developerWebsiteUrl,
       developer_facebook_url: createDto.developerFacebookUrl,
@@ -170,6 +174,28 @@ export class BuildingsService {
         message: `Building with ID '${id}' not found`,
         details: { buildingId: id },
       });
+    }
+
+    // Check if price is changing - create snapshot before update
+    // Convert to numbers for comparison (database decimals may be strings)
+    const currentPriceMin = building.price_per_m2_min ? Number(building.price_per_m2_min) : null;
+    const currentPriceMax = building.price_per_m2_max ? Number(building.price_per_m2_max) : null;
+    const newPriceMin = updateDto.pricePerM2Min !== undefined ? Number(updateDto.pricePerM2Min) : currentPriceMin;
+    const newPriceMax = updateDto.pricePerM2Max !== undefined ? Number(updateDto.pricePerM2Max) : currentPriceMax;
+    
+    const priceChanged = 
+      (updateDto.pricePerM2Min !== undefined && newPriceMin !== currentPriceMin) ||
+      (updateDto.pricePerM2Max !== undefined && newPriceMax !== currentPriceMax);
+
+    if (priceChanged && currentPriceMin !== null && currentPriceMax !== null) {
+      // Create pricing snapshot before updating
+      const snapshot = this.pricingSnapshotRepository.create({
+        building_id: building.id,
+        price_per_m2_min: building.price_per_m2_min,
+        price_per_m2_max: building.price_per_m2_max,
+        currency: building.currency,
+      });
+      await this.pricingSnapshotRepository.save(snapshot);
     }
 
     // Transform camelCase to snake_case for database
@@ -228,14 +254,14 @@ export class BuildingsService {
     // Soft delete: set status to archived and deleted_at
     const deletedAt = new Date();
     await this.buildingsRepository.update(id, {
-      status: 'archived',
+      status: BuildingStatus.ARCHIVED,
       deleted_at: deletedAt,
     });
 
     return {
       data: {
         id: building.id,
-        status: 'archived',
+        status: BuildingStatus.ARCHIVED,
         deletedAt: deletedAt.toISOString(),
       },
     };

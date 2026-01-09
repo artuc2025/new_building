@@ -11,6 +11,7 @@ import {
   IsString,
   Matches,
 } from 'class-validator';
+import { BuildingStatus } from '@new-building-portal/contracts';
 
 /**
  * Public query DTO - only allows published buildings.
@@ -114,11 +115,11 @@ export class PublicListBuildingsQueryDto {
 
   @ApiPropertyOptional({
     description: 'Status filter (public endpoints only expose published buildings). Defaults to "published".',
-    enum: ['published'],
-    default: 'published',
+    enum: [BuildingStatus.PUBLISHED],
+    default: BuildingStatus.PUBLISHED,
   })
   @IsOptional()
-  @IsEnum(['published'])
-  status?: string = 'published';
+  @IsEnum([BuildingStatus.PUBLISHED])
+  status?: string = BuildingStatus.PUBLISHED;
 }
 

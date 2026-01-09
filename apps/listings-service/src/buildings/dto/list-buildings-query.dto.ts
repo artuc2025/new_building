@@ -11,6 +11,7 @@ import {
   IsEnum,
   Matches,
 } from 'class-validator';
+import { BuildingStatus } from '@new-building-portal/contracts';
 
 export class ListBuildingsQueryDto {
   @ApiPropertyOptional({ description: 'Page number (1-based)', example: 1, default: 1, minimum: 1 })
@@ -92,10 +93,10 @@ export class ListBuildingsQueryDto {
 
   @ApiPropertyOptional({
     description: 'Status filter (public: published only; admin: draft, published, archived, all). Defaults to "all" for admin, "published" for public.',
-    enum: ['published', 'draft', 'archived', 'all'],
+    enum: [BuildingStatus.PUBLISHED, BuildingStatus.DRAFT, BuildingStatus.ARCHIVED, 'all'],
   })
   @IsOptional()
-  @IsEnum(['published', 'draft', 'archived', 'all'])
+  @IsEnum([BuildingStatus.PUBLISHED, BuildingStatus.DRAFT, BuildingStatus.ARCHIVED, 'all'])
   status?: string;
 
   @ApiPropertyOptional({

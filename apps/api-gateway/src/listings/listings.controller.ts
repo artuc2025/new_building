@@ -15,7 +15,7 @@ import {
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody, ApiResponse, ApiHeader, ApiOkResponse, ApiCreatedResponse, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
-import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto } from '@new-building-portal/contracts';
+import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto, BuildingResponseDto, PaginationMetaDto, ResponseMetaDto, BuildingStatus } from '@new-building-portal/contracts';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -258,22 +258,22 @@ export class ListingsController {
   @ApiQuery({ name: 'commissioning_date_from', required: false, type: String, description: 'Commissioning date from (ISO 8601 date string)' })
   @ApiQuery({ name: 'commissioning_date_to', required: false, type: String, description: 'Commissioning date to (ISO 8601 date string)' })
   @ApiQuery({ name: 'bbox', required: false, type: String, description: 'Bounding box filter: "minLng,minLat,maxLng,maxLat"' })
-  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status filter (public endpoints only expose published buildings). Defaults to "published".', enum: ['published'] })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Status filter (public endpoints only expose published buildings). Defaults to "published".', enum: [BuildingStatus.PUBLISHED] })
   @ApiOkResponse({ type: PaginatedBuildingsResponseDto, description: 'List of buildings retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async findAll(@Req() req: Request): Promise<any> {
+  async findAll(@Req() req: Request): Promise<PaginatedBuildingsResponseDto> {
     // Public endpoints: enforce published-only status
     // If status is provided, validate it's 'published', otherwise default to 'published'
     const query = { ...(req.query as Record<string, any>) };
-    if (query.status && query.status !== 'published') {
+    if (query.status && query.status !== BuildingStatus.PUBLISHED) {
       // Reject any non-published status for public endpoints
       throw new HttpException(
         {
           error: {
             code: 'BAD_REQUEST',
             message: 'Invalid status value. Public endpoints only accept status="published"',
-            details: { provided: query.status, allowed: ['published'] },
+            details: { provided: query.status, allowed: [BuildingStatus.PUBLISHED] },
             statusCode: HttpStatus.BAD_REQUEST,
           },
         },
@@ -281,7 +281,7 @@ export class ListingsController {
       );
     }
     // Set status to published if not provided or ensure it's published
-    query.status = 'published';
+    query.status = BuildingStatus.PUBLISHED;
     // Strip search parameter (not supported in Sprint 2)
     delete query.search;
     const queryString = this.buildQueryString(query);
@@ -297,7 +297,7 @@ export class ListingsController {
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
+  async findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<BuildingEnvelopeDto> {
     // Public endpoints: strip status parameter to enforce published-only
     const query = { ...(req.query as Record<string, any>) };
     delete query.status;
@@ -322,7 +322,7 @@ export class ListingsController {
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async create(@Req() req: Request): Promise<any> {
+  async create(@Req() req: Request): Promise<BuildingEnvelopeDto> {
     // proxyRequest already forwards all headers including x-admin-key
     return this.proxyRequest('POST', '/v1/buildings', req, req.body);
   }
@@ -351,7 +351,7 @@ export class ListingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
   @ApiResponse({ status: 404, description: 'Building not found' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
-  async update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
+  async update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<BuildingEnvelopeDto> {
     // proxyRequest already forwards all headers including x-admin-key
     return this.proxyRequest('PUT', `/v1/buildings/${id}`, req, req.body);
   }
@@ -371,7 +371,7 @@ export class ListingsController {
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
-            status: { type: 'string', enum: ['archived'] },
+            status: { type: 'string', enum: [BuildingStatus.ARCHIVED] },
             deletedAt: { type: 'string', format: 'date-time' },
           },
         },

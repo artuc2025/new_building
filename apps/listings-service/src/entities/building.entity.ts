@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Developer } from './developer.entity';
 import { Region } from './region.entity';
+import { BuildingStatus } from '@new-building-portal/contracts';
 
 @Entity('buildings', { schema: 'listings' })
 export class Building {
@@ -80,8 +81,8 @@ export class Building {
   @JoinColumn({ name: 'region_id' })
   region: Region;
 
-  @Column({ type: 'varchar', length: 20, nullable: false, default: 'draft' })
-  status: 'draft' | 'published' | 'archived';
+  @Column({ type: 'varchar', length: 20, nullable: false, default: BuildingStatus.DRAFT })
+  status: BuildingStatus;
 
   @Column({ type: 'boolean', nullable: true, default: false })
   is_featured?: boolean;
