@@ -16,9 +16,19 @@ const skipDatabaseConnection = process.env.SKIP_DB_CONNECTION === 'true' || proc
     }),
     TypeOrmModule.forRootAsync({
       useFactory: async () => {
+        const host = process.env.LISTINGS_DB_HOST || 'localhost';
+        const port = parseInt(process.env.LISTINGS_DB_PORT || '5432', 10);
+        const username = process.env.LISTINGS_DB_USER || 'postgres';
+        const password = process.env.LISTINGS_DB_PASSWORD || 'postgres';
+        const database = process.env.LISTINGS_DB_NAME || 'new_building_portal';
+
         const config: any = {
           type: 'postgres',
-          url: process.env.DATABASE_URL || process.env.DATABASE_URL_LISTINGS || 'postgresql://postgres:postgres@localhost:5432/new_building_portal',
+          host,
+          port,
+          username,
+          password,
+          database,
           schema: 'listings',
           synchronize: false,
           logging: process.env.NODE_ENV === 'development',
