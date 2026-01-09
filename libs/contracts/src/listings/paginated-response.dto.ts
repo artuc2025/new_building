@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { ApiProperty } from '@nestjs/swagger';
 import { BuildingResponseDto } from './building-response.dto';
 

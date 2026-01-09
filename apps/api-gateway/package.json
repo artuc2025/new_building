@@ -5,7 +5,7 @@
   "main": "./dist/main.js",
   "scripts": {
     "build": "tsc",
-    "serve": "tsx watch src/main.ts",
+    "serve": "ts-node --transpile-only -r tsconfig-paths/register src/main.ts",
     "start": "node dist/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
