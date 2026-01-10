@@ -4,12 +4,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaController } from './controllers/media.controller';
 import { StorageService, ImageProcessorService, EventService, MediaService } from './services';
 import { Asset, ProcessingJob } from './entities';
+import { configValidationSchema } from './config/config.schema';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
+      validationSchema: configValidationSchema,
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: false,
+      },
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => {

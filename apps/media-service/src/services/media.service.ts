@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
+import { fromBuffer } from 'file-type';
 import { StorageService } from './storage.service';
 import { ImageProcessorService } from './image-processor.service';
 import { EventService } from './event.service';
@@ -13,6 +14,13 @@ export class MediaService {
   private readonly logger = new Logger(MediaService.name);
   private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private readonly ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  // Magic bytes mapping: file extension -> MIME type
+  private readonly ALLOWED_FILE_TYPES = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+  };
 
   constructor(
     @InjectRepository(Asset)
@@ -35,37 +43,50 @@ export class MediaService {
 
     const fileBuffer = file.buffer;
     const originalFilename = file.originalname;
-    const mimeType = file.mimetype;
     const fileSize = file.size;
+
+    // Validate magic bytes (file signature) - SECURITY: Reject if magic bytes don't match
+    const validatedMimeType = await this.validateMagicBytes(fileBuffer);
+    if (!validatedMimeType) {
+      throw new BadRequestException(
+        'File type validation failed. The file signature does not match the allowed image types (JPEG, PNG, WebP).',
+      );
+    }
 
     // Get image metadata
     const metadata = await this.imageProcessor.getImageMetadata(fileBuffer);
 
-    // Generate unique object key
-    const fileExtension = originalFilename.split('.').pop() || 'jpg';
-    const objectKey = `raw/${randomUUID()}.${fileExtension}`;
+    // Generate UUID-based filename for MinIO (sanitized, no special characters)
+    // Store original filename only in database metadata
+    const fileExtension = this.getFileExtensionFromMimeType(validatedMimeType);
+    const uuidFilename = `${randomUUID()}.${fileExtension}`;
+    const objectKey = `raw/${uuidFilename}`;
     const bucket = 'raw';
 
-    // Create asset record with pending status
-    const asset = this.assetRepository.create({
-      original_filename: originalFilename,
-      mime_type: mimeType,
-      file_size: fileSize,
-      bucket,
-      object_key: objectKey,
-      width: metadata.width,
-      height: metadata.height,
-      processing_status: 'pending',
-    });
-
-    const savedAsset = await this.assetRepository.save(asset);
+    let savedAsset: Asset | null = null;
+    let fileUploaded = false;
 
     try {
-      // Upload original to MinIO
+      // Upload original to MinIO first
       await this.storageService.uploadFileFromBuffer(bucket, objectKey, fileBuffer, {
-        'Content-Type': mimeType,
+        'Content-Type': validatedMimeType,
         'original-filename': originalFilename,
       });
+      fileUploaded = true;
+
+      // Create asset record with pending status
+      const asset = this.assetRepository.create({
+        original_filename: originalFilename,
+        mime_type: validatedMimeType,
+        file_size: fileSize,
+        bucket,
+        object_key: objectKey,
+        width: metadata.width,
+        height: metadata.height,
+        processing_status: 'pending',
+      });
+
+      savedAsset = await this.assetRepository.save(asset);
 
       // Update status to processing
       savedAsset.processing_status = 'processing';
@@ -76,10 +97,33 @@ export class MediaService {
 
       return savedAsset;
     } catch (error) {
-      this.logger.error(`Failed to upload image for asset ${savedAsset.id}:`, error);
-      savedAsset.processing_status = 'failed';
-      savedAsset.processing_error = error instanceof Error ? error.message : 'Unknown error';
-      await this.assetRepository.save(savedAsset);
+      this.logger.error(`Failed to upload image:`, error);
+
+      // COMPENSATING TRANSACTION: If DB insert failed but file was uploaded, delete from MinIO
+      if (fileUploaded && objectKey) {
+        try {
+          await this.storageService.deleteFile(bucket, objectKey);
+          this.logger.log(`Compensating transaction: Deleted orphaned file ${bucket}/${objectKey}`);
+        } catch (deleteError) {
+          this.logger.error(
+            `Failed to delete orphaned file ${bucket}/${objectKey} during compensating transaction:`,
+            deleteError,
+          );
+          // Log but don't throw - we've already failed
+        }
+      }
+
+      // Update asset status if it was created
+      if (savedAsset) {
+        savedAsset.processing_status = 'failed';
+        savedAsset.processing_error = error instanceof Error ? error.message : 'Unknown error';
+        try {
+          await this.assetRepository.save(savedAsset);
+        } catch (saveError) {
+          this.logger.error(`Failed to update asset status after error:`, saveError);
+        }
+      }
+
       throw error;
     }
   }
@@ -211,5 +255,62 @@ export class MediaService {
         `File type not allowed. Allowed types: ${this.ALLOWED_MIME_TYPES.join(', ')}`,
       );
     }
+  }
+
+  /**
+   * Validate file magic bytes (file signature) to ensure actual file type matches declared type
+   * SECURITY: This prevents file type spoofing by checking the actual file buffer signature
+   * @param buffer File buffer
+   * @returns Validated MIME type or null if validation fails
+   */
+  private async validateMagicBytes(buffer: Buffer): Promise<string | null> {
+    try {
+      const fileType = await fromBuffer(buffer);
+      if (!fileType) {
+        this.logger.warn('File type detection failed: No magic bytes match found');
+        return null;
+      }
+
+      const detectedMimeType = fileType.mime;
+      const detectedExt = fileType.ext;
+
+      // Check if detected MIME type is in our allowed list
+      if (!this.ALLOWED_MIME_TYPES.includes(detectedMimeType)) {
+        this.logger.warn(
+          `Magic bytes validation failed: Detected MIME type ${detectedMimeType} (ext: ${detectedExt}) is not allowed`,
+        );
+        return null;
+      }
+
+      // Additional check: ensure the extension matches the MIME type
+      const expectedMimeType = this.ALLOWED_FILE_TYPES[detectedExt as keyof typeof this.ALLOWED_FILE_TYPES];
+      if (!expectedMimeType || expectedMimeType !== detectedMimeType) {
+        this.logger.warn(
+          `Magic bytes validation failed: Extension ${detectedExt} does not match MIME type ${detectedMimeType}`,
+        );
+        return null;
+      }
+
+      this.logger.log(`Magic bytes validation passed: ${detectedMimeType} (${detectedExt})`);
+      return detectedMimeType;
+    } catch (error) {
+      this.logger.error('Error during magic bytes validation:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get file extension from MIME type
+   * @param mimeType MIME type
+   * @returns File extension
+   */
+  private getFileExtensionFromMimeType(mimeType: string): string {
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    };
+    return mimeToExt[mimeType] || 'jpg';
   }
 }
