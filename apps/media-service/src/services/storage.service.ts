@@ -22,7 +22,9 @@ export class StorageService implements OnModuleInit {
     // Initialize MinIO client - use ConfigService if available, otherwise use process.env
     const endPoint = this.configService?.get<string>('MINIO_ENDPOINT') || process.env.MINIO_ENDPOINT || 'localhost';
     const port = this.configService?.get<number>('MINIO_PORT') || parseInt(process.env.MINIO_PORT || '9000', 10);
-    const useSSL = this.configService?.get<boolean>('MINIO_USE_SSL') || process.env.MINIO_USE_SSL === 'true';
+    // Convert MINIO_USE_SSL to boolean - handle both string and boolean values
+    const useSSLValue = this.configService?.get<string | boolean>('MINIO_USE_SSL') ?? process.env.MINIO_USE_SSL;
+    const useSSL = typeof useSSLValue === 'boolean' ? useSSLValue : useSSLValue === 'true';
     const accessKey = this.configService?.get<string>('MINIO_ROOT_USER') || process.env.MINIO_ROOT_USER || 'minioadmin';
     const secretKey = this.configService?.get<string>('MINIO_ROOT_PASSWORD') || process.env.MINIO_ROOT_PASSWORD || 'minioadmin';
 

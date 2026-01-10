@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { connect, NatsConnection, JetStreamClient, JsMsg, JSONCodec } from 'nats';
+import { connect, NatsConnection, JetStreamClient, JetStreamManager, JsMsg, JSONCodec, AckPolicy, RetentionPolicy } from 'nats';
 import { MeilisearchService } from './meilisearch.service';
 import { BuildingLocation, IndexSyncStatus, Inbox } from '../entities';
 
@@ -41,6 +41,7 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SearchSyncService.name);
   private natsConnection: NatsConnection | null = null;
   private jetStreamClient: JetStreamClient | null = null;
+  private jetStreamManager: JetStreamManager | null = null;
   private readonly jsonCodec = JSONCodec<BuildingEvent>();
   private consumers: any[] = [];
 
@@ -82,6 +83,7 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
       const natsUrl = this.configService.get<string>('NATS_URL', 'nats://localhost:4222');
       this.natsConnection = await connect({ servers: natsUrl });
       this.jetStreamClient = this.natsConnection.jetstream();
+      this.jetStreamManager = await this.natsConnection.jetstreamManager();
       this.logger.log('Connected to NATS JetStream');
     } catch (error) {
       this.logger.error('Failed to connect to NATS:', error);
@@ -97,41 +99,34 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
     // Subscribe to all building events using a single consumer
     // The stream should match subjects: "listings.building.*"
     const streamName = 'listings-events';
+    const subject = 'listings.building.>';
     const durableName = 'search-consumer';
 
     try {
-      // Try to get or create consumer
-      let consumer;
-      try {
-        consumer = await this.jetStreamClient.consumers.get(streamName, durableName);
-        this.logger.log(`Found existing consumer: ${durableName}`);
-      } catch (error: any) {
+      // First, ensure the stream exists
+      await this.ensureStreamExists(streamName, subject);
+      
+      // Use ordered consumer - simplest approach, no ack required
+      this.logger.log(`Setting up consumer: ${durableName}`);
+      
+      // Subscribe with ordered consumer - best for read-only event processing
+      const consumer = await this.jetStreamClient.consumers.get(streamName, durableName).catch(async () => {
         // Consumer doesn't exist, create it
-        if (error.code === '404' || error.message?.includes('not found')) {
-          this.logger.log(`Creating consumer: ${durableName}`);
-          consumer = await this.jetStreamClient.consumers.create(streamName, {
-            durable_name: durableName,
-            ack_policy: 'explicit',
-            filter_subject: 'listings.building.>',
-            max_deliver: 5,
-            ack_wait: 30000, // 30 seconds
-          });
-          this.logger.log(`Consumer created: ${durableName}`);
-        } else {
-          throw error;
-        }
-      }
-
-      // Start consuming messages
-      const iter = await consumer.consume();
-      this.consumers.push(consumer);
-
-      // Process messages asynchronously
-      this.processMessages(iter).catch((error) => {
+        return await this.jetStreamManager!.consumers.add(streamName, {
+          durable_name: durableName,
+          ack_policy: AckPolicy.Explicit,
+          filter_subject: subject,
+          max_deliver: 5,
+        });
+      });
+      
+      // Get messages from the consumer
+      this.processMessagesFromConsumer(streamName, durableName).catch((error) => {
         this.logger.error(`Error processing messages:`, error);
       });
 
-      this.logger.log(`Consumer set up for stream: ${streamName}`);
+      this.consumers.push(consumer);
+      this.logger.log(`Consumer set up: ${durableName}`);
     } catch (error: any) {
       this.logger.error(`Failed to set up consumer:`, error);
       // Don't throw - allow service to start even if NATS is not available
@@ -139,35 +134,92 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async processMessages(iter: AsyncIterable<JsMsg>) {
-    for await (const msg of iter) {
-      try {
-        // Extract subject from message metadata
-        const subject = msg.subject;
-        const event = this.jsonCodec.decode(msg.data) as BuildingEvent;
-        
-        // Ensure event has required fields
-        if (!event.eventId) {
-          // Try to extract from message headers or generate one
-          const eventIdHeader = msg.headers?.get('eventId') || msg.headers?.get('event-id');
-          event.eventId = eventIdHeader || `msg-${msg.seq}`;
-        }
-        if (!event.eventType) {
-          event.eventType = subject;
-        }
-        if (!event.aggregateId && event.payload?.id) {
-          event.aggregateId = event.payload.id;
-        }
-
-        await this.handleEvent(event, subject);
-        msg.ack();
-      } catch (error) {
-        this.logger.error(`Error processing message from ${msg.subject}:`, error);
-        // Don't ack - let NATS redeliver
-        // After max deliveries, it will go to DLQ
+  private async ensureStreamExists(streamName: string, subject: string) {
+    try {
+      if (!this.jetStreamManager) {
+        throw new Error('JetStream manager not available');
       }
+
+      try {
+        await this.jetStreamManager.streams.info(streamName);
+        this.logger.log(`Stream ${streamName} already exists`);
+      } catch (error: any) {
+        if (error.code === '404' || error.message?.includes('not found')) {
+          // Stream doesn't exist, create it
+          this.logger.log(`Creating stream: ${streamName}`);
+          await this.jetStreamManager.streams.add({
+            name: streamName,
+            subjects: [subject.replace('.>', '.*')], // Convert .> to .* for stream subjects
+            retention: RetentionPolicy.Interest,
+            max_age: 7 * 24 * 60 * 60 * 1000 * 1000 * 1000, // 7 days in nanoseconds
+            duplicate_window: 2 * 60 * 1000 * 1000 * 1000, // 2 minutes in nanoseconds
+          });
+          this.logger.log(`Stream ${streamName} created`);
+        } else {
+          throw error;
+        }
+      }
+    } catch (error: any) {
+      this.logger.warn(`Could not ensure stream exists: ${error.message}. Stream may need to be created manually.`);
+      // Don't throw - allow service to start even if stream setup fails
     }
   }
+
+  private async processMessagesFromConsumer(streamName: string, consumerName: string) {
+    try {
+      if (!this.jetStreamClient) {
+        throw new Error('JetStream client not initialized');
+      }
+
+      const consumer = await this.jetStreamClient.consumers.get(streamName, consumerName);
+      
+      // Continuously fetch and process messages
+      while (true) {
+        try {
+          const messages = await consumer.fetch({ max_messages: 10, expires: 5000 });
+          
+          for await (const msg of messages) {
+            try {
+              // Extract subject from message metadata
+              const subject = msg.subject;
+              const event = this.jsonCodec.decode(msg.data) as BuildingEvent;
+              
+              // Ensure event has required fields
+              if (!event.eventId) {
+                // Try to extract from message headers or generate one
+                const eventIdHeader = msg.headers?.get('eventId') || msg.headers?.get('event-id');
+                event.eventId = eventIdHeader || `msg-${msg.seq}`;
+              }
+              if (!event.eventType) {
+                event.eventType = subject;
+              }
+              if (!event.aggregateId && event.payload?.id) {
+                event.aggregateId = event.payload.id;
+              }
+
+              await this.handleEvent(event, subject);
+              msg.ack();
+            } catch (error) {
+              this.logger.error(`Error processing message from ${msg.subject}:`, error);
+              // Don't ack - let NATS redeliver
+              // After max deliveries, it will go to DLQ
+            }
+          }
+        } catch (error: any) {
+          // If no messages or timeout, wait before next fetch
+          if (error.code === '408' || error.message?.includes('timeout') || error.message?.includes('no messages')) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          } else {
+            this.logger.error(`Error fetching messages:`, error);
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error in message consumption:`, error);
+    }
+  }
+
 
   /**
    * Handle building event with idempotency check.

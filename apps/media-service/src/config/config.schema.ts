@@ -1,4 +1,4 @@
-import * as Joi from 'joi';
+import Joi from 'joi';
 
 /**
  * Configuration validation schema for Media Service
@@ -6,22 +6,22 @@ import * as Joi from 'joi';
  * Required fields must be provided, optional fields have defaults
  */
 export const configValidationSchema = Joi.object({
-  // Database Configuration (all required)
-  MEDIA_DB_HOST: Joi.string().required(),
-  MEDIA_DB_PORT: Joi.number().port().required(),
-  MEDIA_DB_USER: Joi.string().required(),
-  MEDIA_DB_PASSWORD: Joi.string().required(),
-  MEDIA_DB_NAME: Joi.string().required(),
+  // Database Configuration (with defaults for development)
+  MEDIA_DB_HOST: Joi.string().optional().default('localhost'),
+  MEDIA_DB_PORT: Joi.number().port().optional().default(5432),
+  MEDIA_DB_USER: Joi.string().optional().default('postgres'),
+  MEDIA_DB_PASSWORD: Joi.string().optional().default('postgres'),
+  MEDIA_DB_NAME: Joi.string().optional().default('new_building_portal'),
 
-  // MinIO Configuration (all required)
-  MINIO_ENDPOINT: Joi.string().required(),
-  MINIO_PORT: Joi.number().port().required(),
+  // MinIO Configuration (with defaults for development)
+  MINIO_ENDPOINT: Joi.string().optional().default('localhost'),
+  MINIO_PORT: Joi.number().port().optional().default(9000),
   MINIO_USE_SSL: Joi.string().valid('true', 'false').optional().default('false'),
-  MINIO_ROOT_USER: Joi.string().required(),
-  MINIO_ROOT_PASSWORD: Joi.string().required(),
+  MINIO_ROOT_USER: Joi.string().optional().default('minioadmin'),
+  MINIO_ROOT_PASSWORD: Joi.string().optional().default('minioadmin'),
 
-  // NATS Configuration (required)
-  NATS_URL: Joi.string().uri().required(),
+  // NATS Configuration (with default)
+  NATS_URL: Joi.string().uri().optional().default('nats://localhost:4222'),
 
   // Service Configuration (optional with defaults)
   MEDIA_SERVICE_PORT: Joi.number().port().optional().default(3003),

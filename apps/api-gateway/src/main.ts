@@ -12,12 +12,8 @@ async function bootstrap() {
   
   const configService = app.get(ConfigService);
   
-  // Validate required environment variables
-  const listingsServiceUrl = configService.get<string>('LISTINGS_SERVICE_URL');
-  if (!listingsServiceUrl) {
-    console.error('Error: LISTINGS_SERVICE_URL environment variable is required');
-    process.exit(1);
-  }
+  // Get environment variables with defaults
+  const listingsServiceUrl = configService.get<string>('LISTINGS_SERVICE_URL', 'http://localhost:3001');
   
   const port = configService.get<number>('API_GATEWAY_PORT', 3000);
   const corsOrigin = configService.get<string>('API_GATEWAY_CORS_ORIGIN', 'http://localhost:3001');

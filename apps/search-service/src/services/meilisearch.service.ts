@@ -57,11 +57,20 @@ export class MeilisearchService implements OnModuleInit {
         this.logger.log(`Index ${this.indexName} already exists`);
       } catch (error: any) {
         // Index doesn't exist, create it
-        if (error.errorCode === 'index_not_found') {
+        // Check for various error patterns that indicate index not found
+        const isIndexNotFound = 
+          error.code === 'index_not_found' || 
+          error.errorCode === 'index_not_found' ||
+          (error.message && error.message.includes('not found')) ||
+          (error.type === 'index_not_found');
+        
+        if (isIndexNotFound) {
           this.logger.log(`Creating index ${this.indexName}`);
-          this.buildingsIndex = await this.client.createIndex(this.indexName, {
+          await this.client.createIndex(this.indexName, {
             primaryKey: 'buildingId',
           });
+          this.buildingsIndex = this.client.index(this.indexName);
+          this.logger.log(`Index ${this.indexName} created successfully`);
         } else {
           throw error;
         }
