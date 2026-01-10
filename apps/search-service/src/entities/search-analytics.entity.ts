@@ -34,6 +34,6 @@ export class SearchAnalytics {
   @Column({ type: 'varchar', length: 50, nullable: true, name: 'search_type' })
   searchType?: 'text' | 'map' | 'faceted'; // Type of search performed
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 }

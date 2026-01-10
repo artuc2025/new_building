@@ -17,13 +17,13 @@ export class Inbox {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: false, unique: true })
+  @Column({ type: 'varchar', length: 100, nullable: false, unique: true, name: 'event_id' })
   eventId: string; // From event metadata - ensures idempotency
 
-  @Column({ type: 'varchar', length: 100, nullable: false })
+  @Column({ type: 'varchar', length: 100, nullable: false, name: 'event_type' })
   eventType: string; // e.g., 'listings.building.created'
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: 'uuid', nullable: false, name: 'aggregate_id' })
   aggregateId: string; // Building ID, etc.
 
   @Column({ type: 'jsonb', nullable: false })
@@ -37,12 +37,12 @@ export class Inbox {
   })
   status: 'pending' | 'processed' | 'failed';
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true, name: 'processed_at' })
   processedAt?: Date;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, name: 'error_message' })
   errorMessage?: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 }

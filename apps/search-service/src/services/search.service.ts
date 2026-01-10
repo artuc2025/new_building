@@ -168,7 +168,7 @@ export class SearchService {
       try {
         locations = await this.buildingLocationRepository
           .createQueryBuilder('bl')
-          .select('bl.buildingId', 'buildingId')
+          .select('bl.building_id', 'buildingId')
           .addSelect('ST_AsText(bl.location)', 'location_text')
           .addSelect('bl.metadata', 'metadata')
           .where(

@@ -11,6 +11,7 @@ import {
   BuildingResponseDto,
   PaginatedBuildingsResponseDto,
 } from './dto';
+import { EventService } from '../services/event.service';
 
 // Safe sort mapping: enum value -> { column, direction }
 const SORT_MAP: Record<string, { column: string; direction: 'ASC' | 'DESC' }> = {
@@ -31,6 +32,7 @@ export class BuildingsService {
     private buildingsRepository: Repository<Building>,
     @InjectRepository(PricingSnapshot)
     private pricingSnapshotRepository: Repository<PricingSnapshot>,
+    private eventService: EventService,
   ) {}
 
   async findAll(query: ListBuildingsQueryDto, isAdmin: boolean = false): Promise<PaginatedBuildingsResponseDto> {
@@ -178,7 +180,28 @@ export class BuildingsService {
     const result = await this.buildingsRepository.query(sql, values);
     const savedId = result[0].id;
     const currency = createDto.currency || 'AMD';
-    return this.findOne(savedId, currency, true);
+    const building = await this.findOne(savedId, currency, true);
+    
+    // Publish event
+    await this.eventService.publishBuildingCreated({
+      id: building.id,
+      title: building.title,
+      address: building.address,
+      description: building.description,
+      location: building.location,
+      pricePerM2Min: building.pricePerM2Min,
+      pricePerM2Max: building.pricePerM2Max,
+      areaMin: building.areaMin,
+      areaMax: building.areaMax,
+      floors: building.floors,
+      commissioningDate: typeof building.commissioningDate === 'string' ? building.commissioningDate : building.commissioningDate?.toISOString(),
+      developerId: building.developerId,
+      regionId: building.regionId,
+      status: building.status,
+      updatedAt: typeof building.updatedAt === 'string' ? building.updatedAt : building.updatedAt?.toISOString(),
+    });
+    
+    return building;
   }
 
   async update(id: string, updateDto: UpdateBuildingDto): Promise<BuildingResponseDto> {
@@ -276,7 +299,28 @@ export class BuildingsService {
 
     // Admin operations should use admin view (isAdmin=true) to see drafts/archived
     const currency = updateDto.currency || building.currency || 'AMD';
-    return this.findOne(id, currency, true);
+    const updatedBuilding = await this.findOne(id, currency, true);
+    
+    // Publish event
+    await this.eventService.publishBuildingUpdated({
+      id: updatedBuilding.id,
+      title: updatedBuilding.title,
+      address: updatedBuilding.address,
+      description: updatedBuilding.description,
+      location: updatedBuilding.location,
+      pricePerM2Min: updatedBuilding.pricePerM2Min,
+      pricePerM2Max: updatedBuilding.pricePerM2Max,
+      areaMin: updatedBuilding.areaMin,
+      areaMax: updatedBuilding.areaMax,
+      floors: updatedBuilding.floors,
+      commissioningDate: typeof updatedBuilding.commissioningDate === 'string' ? updatedBuilding.commissioningDate : updatedBuilding.commissioningDate?.toISOString(),
+      developerId: updatedBuilding.developerId,
+      regionId: updatedBuilding.regionId,
+      status: updatedBuilding.status,
+      updatedAt: typeof updatedBuilding.updatedAt === 'string' ? updatedBuilding.updatedAt : updatedBuilding.updatedAt?.toISOString(),
+    });
+    
+    return updatedBuilding;
   }
 
   async publish(id: string, publish: boolean): Promise<BuildingResponseDto> {
@@ -300,7 +344,30 @@ export class BuildingsService {
       published_at: publishedAt,
     });
 
-    return this.findOne(id, building.currency, true);
+    const updatedBuilding = await this.findOne(id, building.currency, true);
+    
+    // Publish event
+    if (publish) {
+      await this.eventService.publishBuildingPublished({
+        id: updatedBuilding.id,
+        title: updatedBuilding.title,
+        address: updatedBuilding.address,
+        description: updatedBuilding.description,
+        location: updatedBuilding.location,
+        pricePerM2Min: updatedBuilding.pricePerM2Min,
+        pricePerM2Max: updatedBuilding.pricePerM2Max,
+        areaMin: updatedBuilding.areaMin,
+        areaMax: updatedBuilding.areaMax,
+        floors: updatedBuilding.floors,
+        commissioningDate: typeof updatedBuilding.commissioningDate === 'string' ? updatedBuilding.commissioningDate : updatedBuilding.commissioningDate?.toISOString(),
+        developerId: updatedBuilding.developerId,
+        regionId: updatedBuilding.regionId,
+        status: updatedBuilding.status,
+        updatedAt: typeof updatedBuilding.updatedAt === 'string' ? updatedBuilding.updatedAt : updatedBuilding.updatedAt?.toISOString(),
+      });
+    }
+    
+    return updatedBuilding;
   }
 
   async remove(id: string): Promise<{ data: { id: string; status: string; deletedAt: string } }> {
@@ -322,6 +389,9 @@ export class BuildingsService {
       status: BuildingStatus.ARCHIVED,
       deleted_at: deletedAt,
     });
+
+    // Publish event
+    await this.eventService.publishBuildingDeleted(building.id);
 
     return {
       data: {

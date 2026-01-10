@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaController } from './controllers/media.controller';
-import { StorageService, ImageProcessorService, EventService, MediaService } from './services';
+import { StorageService } from './services/storage.service';
+import { ImageProcessorService } from './services/image-processor.service';
+import { EventService } from './services/event.service';
+import { MediaService } from './services/media.service';
 import { Asset, ProcessingJob } from './entities';
 import { configValidationSchema } from './config/config.schema';
 

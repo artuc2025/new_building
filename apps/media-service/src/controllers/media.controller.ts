@@ -18,7 +18,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 @Controller('v1/media')
 export class MediaController {
-  constructor(private readonly mediaService: MediaService) {}
+  constructor(private readonly mediaService: MediaService) {
+    console.log('MediaController initialized. MediaService is:', this.mediaService ? 'defined' : 'undefined');
+  }
 
   /**
    * Upload an image file

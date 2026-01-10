@@ -321,21 +321,25 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
 
     // Action B: Upsert building_locations read-model
     if (payload.location) {
-      // Convert JSON { lat, lng } to WKT for PostgreSQL GEOGRAPHY storage
-      const wktLocation = this.convertToWKT(payload.location);
+      // Use Raw SQL to handle PostGIS GEOGRAPHY type
       const metadata = {
         price: payload.pricePerM2Min,
         title: payload.title,
         thumbnail: payload.thumbnail,
       };
 
-      await this.buildingLocationRepository.upsert(
-        {
-          buildingId: payload.id,
-          location: wktLocation, // Store as WKT for PostGIS GEOGRAPHY column
-          metadata,
-        },
-        ['buildingId'],
+      // Use raw SQL for upsert with PostGIS
+      await this.buildingLocationRepository.query(
+        `
+        INSERT INTO search.building_locations (building_id, location, metadata, created_at, updated_at)
+        VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, NOW(), NOW())
+        ON CONFLICT (building_id)
+        DO UPDATE SET
+          location = ST_SetSRID(ST_MakePoint($2, $3), 4326),
+          metadata = $4,
+          updated_at = NOW()
+        `,
+        [payload.id, payload.location.lng, payload.location.lat, JSON.stringify(metadata)]
       );
     }
 

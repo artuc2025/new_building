@@ -5,11 +5,12 @@ import { BuildingsAdminController } from './buildings-admin.controller';
 import { BuildingsService } from './buildings.service';
 import { Building } from '../entities/building.entity';
 import { PricingSnapshot } from '../entities/pricing-snapshot.entity';
+import { EventService } from '../services/event.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Building, PricingSnapshot])],
   controllers: [BuildingsController, BuildingsAdminController],
-  providers: [BuildingsService],
+  providers: [BuildingsService, EventService],
   exports: [BuildingsService],
 })
 export class BuildingsModule {}
