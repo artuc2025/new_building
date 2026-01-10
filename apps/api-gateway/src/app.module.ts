@@ -6,6 +6,7 @@ import { HealthController } from './health/health.controller';
 import { TcpHealthIndicator } from './health/tcp-health.indicator';
 import { ListingsModule } from './listings/listings.module';
 import { SearchModule } from './search/search.module';
+import { MediaModule } from './media/media.module';
 import { SwaggerModule } from './swagger/swagger.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { SwaggerModule } from './swagger/swagger.module';
     HttpModule,
     ListingsModule,
     SearchModule,
+    MediaModule,
     SwaggerModule,
   ],
   controllers: [HealthController],

@@ -62,4 +62,40 @@ export class SearchController {
       throw new HttpException('Internal Search Gateway Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
+  @Get('buildings/map')
+  @ApiOperation({ summary: 'Search buildings within map bounds (geospatial)' })
+  @ApiQuery({ name: 'bounds', required: true, type: String, description: 'Bounding box: "lat1,lng1,lat2,lng2"' })
+  @ApiResponse({ status: 200, description: 'Map building points' })
+  @ApiResponse({ status: 503, description: 'Search service unavailable' })
+  async searchBuildingsMap(@Req() req: Request) {
+    const baseUrl = this.getSearchServiceUrl();
+    const queryString = new URLSearchParams(req.query as any).toString();
+    const url = `${baseUrl}/v1/search/buildings/map${queryString ? `?${queryString}` : ''}`;
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get(url, { timeout: 5000 }).pipe(
+          timeout(5000),
+          catchError((error: AxiosError) => {
+            throw new HttpException(
+              {
+                error: {
+                  code: 'SERVICE_UNAVAILABLE',
+                  message: 'Search service is currently unavailable',
+                  details: { service: 'search-service' },
+                  statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+                },
+              },
+              HttpStatus.SERVICE_UNAVAILABLE,
+            );
+          }),
+        ),
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException('Internal Search Gateway Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 }

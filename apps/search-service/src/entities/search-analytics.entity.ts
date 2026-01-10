@@ -22,16 +22,16 @@ export class SearchAnalytics {
   @Column({ type: 'jsonb', nullable: true })
   filters?: Record<string, any>; // Applied filters
 
-  @Column({ type: 'integer', nullable: false, default: 0 })
+  @Column({ type: 'integer', nullable: false, default: 0, name: 'result_count' })
   resultCount: number;
 
-  @Column({ type: 'boolean', nullable: false, default: false })
+  @Column({ type: 'boolean', nullable: false, default: false, name: 'is_zero_result' })
   isZeroResult: boolean; // True if no results found
 
-  @Column({ type: 'integer', nullable: false })
+  @Column({ type: 'integer', nullable: false, name: 'execution_time_ms' })
   executionTimeMs: number; // Query execution time in milliseconds
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'search_type' })
   searchType?: 'text' | 'map' | 'faceted'; // Type of search performed
 
   @CreateDateColumn({ type: 'timestamptz' })

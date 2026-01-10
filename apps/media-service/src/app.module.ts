@@ -45,6 +45,11 @@ import { configValidationSchema } from './config/config.schema';
     TypeOrmModule.forFeature([Asset, ProcessingJob]),
   ],
   controllers: [MediaController],
-  providers: [StorageService, ImageProcessorService, EventService, MediaService],
+  providers: [
+    StorageService,
+    ImageProcessorService,
+    EventService,
+    MediaService,
+  ],
 })
 export class AppModule {}

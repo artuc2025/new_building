@@ -13,7 +13,7 @@ import {
  */
 @Entity('building_locations', { schema: 'search' })
 export class BuildingLocation {
-  @PrimaryColumn({ type: 'uuid' })
+  @PrimaryColumn({ type: 'uuid', name: 'building_id' })
   buildingId: string;
 
   @Column({ type: 'geography', spatialFeatureType: 'Point', srid: 4326, nullable: false })
