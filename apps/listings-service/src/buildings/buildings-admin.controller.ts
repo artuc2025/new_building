@@ -47,6 +47,26 @@ export class BuildingsAdminController {
     return this.buildingsService.findAll(query, true);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get building by ID (admin only, includes soft-deleted)' })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)' })
+  @ApiQuery({ name: 'currency', enum: ['AMD', 'USD'], required: false, description: 'Currency for price conversion' })
+  @ApiResponse({
+    status: 200,
+    description: 'Building retrieved successfully (includes soft-deleted buildings)',
+    type: BuildingEnvelopeDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
+  @ApiResponse({ status: 404, description: 'Building not found' })
+  async findOne(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Query('currency') currency?: string,
+  ) {
+    // Admin endpoints can see all buildings including soft-deleted ones
+    const building = await this.buildingsService.findOne(id, currency || 'AMD', true);
+    return { data: building };
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new building (admin only)' })

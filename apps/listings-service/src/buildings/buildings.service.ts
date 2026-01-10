@@ -96,10 +96,12 @@ export class BuildingsService {
   }
 
   async findOne(id: string, currency: string = 'AMD', isAdmin: boolean = false): Promise<BuildingResponseDto> {
-    const where: any = { id, deleted_at: null };
+    const where: any = { id };
     
-    // Public endpoints only see published buildings
+    // Admin can see all buildings including soft-deleted ones
+    // Public endpoints only see published, non-deleted buildings
     if (!isAdmin) {
+      where.deleted_at = null;
       where.status = BuildingStatus.PUBLISHED;
     }
 
