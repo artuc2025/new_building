@@ -282,8 +282,6 @@ export class ListingsController {
     }
     // Set status to published if not provided or ensure it's published
     query.status = BuildingStatus.PUBLISHED;
-    // Strip search parameter (not supported in Sprint 2)
-    delete query.search;
     const queryString = this.buildQueryString(query);
     const path = `/v1/buildings${queryString ? `?${queryString}` : ''}`;
     return this.proxyRequest('GET', path, req);
@@ -324,7 +322,7 @@ export class ListingsController {
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async create(@Req() req: Request): Promise<BuildingEnvelopeDto> {
     // proxyRequest already forwards all headers including x-admin-key
-    return this.proxyRequest('POST', '/v1/buildings', req, req.body);
+    return this.proxyRequest('POST', '/v1/admin/buildings', req, req.body);
   }
 
   @Put(':id')
@@ -353,7 +351,29 @@ export class ListingsController {
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<BuildingEnvelopeDto> {
     // proxyRequest already forwards all headers including x-admin-key
-    return this.proxyRequest('PUT', `/v1/buildings/${id}`, req, req.body);
+    return this.proxyRequest('PUT', `/v1/admin/buildings/${id}`, req, req.body);
+  }
+
+  @Post(':id/publish')
+  @UseGuards(AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Publish or unpublish a building (admin only)' })
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
+  @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        publish: { type: 'boolean' }
+      }
+    }
+  })
+  @ApiOkResponse({ type: BuildingEnvelopeDto, description: 'Building status updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID format' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - admin key required' })
+  @ApiResponse({ status: 404, description: 'Building not found' })
+  async publish(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<BuildingEnvelopeDto> {
+    return this.proxyRequest('POST', `/v1/admin/buildings/${id}/publish`, req, req.body);
   }
 
   @Delete(':id')
@@ -384,7 +404,7 @@ export class ListingsController {
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Req() req: Request): Promise<any> {
     // proxyRequest already forwards all headers including x-admin-key
-    return this.proxyRequest('DELETE', `/v1/buildings/${id}`, req);
+    return this.proxyRequest('DELETE', `/v1/admin/buildings/${id}`, req);
   }
 }
 

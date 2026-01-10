@@ -147,6 +147,27 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       validateResponse(200, response.body, '/v1/buildings', 'GET');
     });
 
+    it('should return buildings with converted prices when currency=USD is provided', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+      // createTestBuilding creates a building with pricePerM2Min = 500000 by default (check fixtures if needed, assuming default)
+      await createTestBuilding(dataSource, developer.id, region.id, { 
+        status: BuildingStatus.PUBLISHED,
+        price_per_m2_min: 400000,
+        currency: 'AMD'
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/v1/buildings')
+        .query({ currency: 'USD' })
+        .expect(200);
+
+      // Assuming exchange rate is 400 AMD/USD (standard for this project context)
+      // 400000 / 400 = 1000
+      expect(response.body.data[0].pricePerM2Min).toBe(1000);
+      expect(response.body.meta.currency).toBe('USD');
+    });
+
     it('should return 400 for invalid query parameters', async () => {
       await request(app.getHttpServer())
         .get('/v1/buildings')
@@ -210,7 +231,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/buildings')
+        .post('/v1/admin/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
@@ -219,7 +240,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body.data).toHaveProperty('id');
       expect(response.body.data.title.en).toBe('New Building');
 
-      validateResponse(201, response.body, '/v1/buildings', 'POST');
+      validateResponse(201, response.body, '/v1/admin/buildings', 'POST');
     });
 
     it('should accept camelCase fields (addressLine1, addressLine2, postalCode)', async () => {
@@ -241,7 +262,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/buildings')
+        .post('/v1/admin/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
@@ -271,7 +292,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .post('/v1/buildings')
+        .post('/v1/admin/buildings')
         .set('x-admin-key', adminKey)
         .send(createDto)
         .expect(201);
@@ -280,6 +301,29 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body.data.addressLine1).toBe('456 Oak Avenue');
       expect(response.body.data.addressLine2).toBe('Suite 200');
       expect(response.body.data.postalCode).toBe('0002');
+    });
+
+    it('should return 400 for negative pricePerM2Min', async () => {
+      const developer = await createTestDeveloper(dataSource);
+      const region = await createTestRegion(dataSource);
+
+      const createDto = {
+        title: { en: 'Invalid Building' },
+        address: { en: 'Invalid Address' },
+        location: { lat: 40.1811, lng: 44.5091 },
+        floors: 5,
+        areaMin: 60,
+        areaMax: 120,
+        developerId: developer.id,
+        regionId: region.id,
+        pricePerM2Min: -100,
+      };
+
+      await request(app.getHttpServer())
+        .post('/v1/admin/buildings')
+        .set('x-admin-key', adminKey)
+        .send(createDto)
+        .expect(400);
     });
 
     it('should return 401 for missing admin key', async () => {
@@ -298,7 +342,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       await request(app.getHttpServer())
-        .post('/v1/buildings')
+        .post('/v1/admin/buildings')
         .send(createDto)
         .expect(401);
     });
@@ -319,7 +363,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       await request(app.getHttpServer())
-        .post('/v1/buildings')
+        .post('/v1/admin/buildings')
         .set('x-admin-key', 'wrong-key')
         .send(createDto)
         .expect(401);
@@ -347,7 +391,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       };
 
       const response = await request(app.getHttpServer())
-        .put(`/v1/buildings/${building.id}`)
+        .put(`/v1/admin/buildings/${building.id}`)
         .set('x-admin-key', adminKey)
         .send(updateDto)
         .expect(200);
@@ -355,11 +399,11 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.title.en).toBe('Updated Building');
 
-      validateResponse(200, response.body, '/v1/buildings/{id}', 'PUT');
+      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'PUT');
     });
 
     it('should return 404 when building not found', async () => {
-      const nonExistentId = '00000000-0000-0000-0000-000000000000';
+      const nonExistentId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d'; // Valid v4 UUID
       const updateDto = {
         title: { en: 'Updated Building' },
       };
@@ -389,7 +433,7 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       const building = await createTestBuilding(dataSource, developer.id, region.id);
 
       const response = await request(app.getHttpServer())
-        .delete(`/v1/buildings/${building.id}`)
+        .delete(`/v1/admin/buildings/${building.id}`)
         .set('x-admin-key', adminKey)
         .expect(200);
 
@@ -398,14 +442,14 @@ describe('Buildings API Integration Tests (listings-service)', () => {
       expect(response.body.data.status).toBe('archived');
       expect(response.body.data).toHaveProperty('deletedAt');
 
-      validateResponse(200, response.body, '/v1/buildings/{id}', 'DELETE');
+      validateResponse(200, response.body, '/v1/admin/buildings/{id}', 'DELETE');
     });
 
     it('should return 404 when building not found', async () => {
       const nonExistentId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d'; // Valid v4 UUID
 
       await request(app.getHttpServer())
-        .delete(`/v1/buildings/${nonExistentId}`)
+        .delete(`/v1/admin/buildings/${nonExistentId}`)
         .set('x-admin-key', adminKey)
         .expect(404);
     });

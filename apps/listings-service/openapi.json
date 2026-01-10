@@ -187,52 +187,6 @@
         "tags": [
           "buildings"
         ]
-      },
-      "post": {
-        "operationId": "BuildingsController_create",
-        "summary": "Create a new building (admin only)",
-        "parameters": [
-          {
-            "name": "x-admin-key",
-            "in": "header",
-            "description": "Admin API key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateBuildingDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Building created successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BuildingEnvelopeDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input data"
-          },
-          "401": {
-            "description": "Unauthorized - admin token required"
-          }
-        },
-        "tags": [
-          "buildings"
-        ]
       }
     },
     "/v1/buildings/{id}": {
@@ -284,25 +238,263 @@
         "tags": [
           "buildings"
         ]
-      },
-      "put": {
-        "operationId": "BuildingsController_update",
-        "summary": "Update a building (admin only)",
+      }
+    },
+    "/v1/admin/buildings": {
+      "get": {
+        "operationId": "BuildingsAdminController_findAll",
+        "summary": "Get all buildings including drafts (admin only)",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Building ID (UUID)",
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "x-admin-key",
             "in": "header",
             "description": "Admin API key",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (1-based)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "price_min",
+            "required": false,
+            "in": "query",
+            "description": "Minimum price per m² (in selected currency)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "price_max",
+            "required": false,
+            "in": "query",
+            "description": "Maximum price per m² (in selected currency)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "area_min",
+            "required": false,
+            "in": "query",
+            "description": "Minimum area (m²)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "area_max",
+            "required": false,
+            "in": "query",
+            "description": "Maximum area (m²)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "floors_min",
+            "required": false,
+            "in": "query",
+            "description": "Minimum number of floors",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "floors_max",
+            "required": false,
+            "in": "query",
+            "description": "Maximum number of floors",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "developer_id",
+            "required": false,
+            "in": "query",
+            "description": "Developer ID (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "region_id",
+            "required": false,
+            "in": "query",
+            "description": "Region ID (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commissioning_date_from",
+            "required": false,
+            "in": "query",
+            "description": "Commissioning date from (ISO 8601 date string)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commissioning_date_to",
+            "required": false,
+            "in": "query",
+            "description": "Commissioning date to (ISO 8601 date string)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Status filter (public: published only; admin: draft, published, archived, all). Defaults to \"all\" for admin, \"published\" for public.",
+            "schema": {
+              "enum": [
+                "published",
+                "draft",
+                "archived",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort option",
+            "schema": {
+              "default": "date_desc",
+              "enum": [
+                "price_asc",
+                "price_desc",
+                "date_desc",
+                "date_asc",
+                "area_asc",
+                "area_desc",
+                "floors_asc",
+                "floors_desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "Currency for price filtering and conversion",
+            "schema": {
+              "default": "AMD",
+              "enum": [
+                "AMD",
+                "USD"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of buildings retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedBuildingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin-buildings"
+        ]
+      },
+      "post": {
+        "operationId": "BuildingsAdminController_create",
+        "summary": "Create a new building (admin only)",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "description": "Admin API key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBuildingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Building created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin-buildings"
+        ]
+      }
+    },
+    "/v1/admin/buildings/{id}": {
+      "put": {
+        "operationId": "BuildingsAdminController_update",
+        "summary": "Update a building (admin only)",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "description": "Admin API key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Building ID (UUID)",
             "schema": {
               "type": "string"
             }
@@ -328,39 +520,30 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Invalid input data or UUID format"
-          },
-          "401": {
-            "description": "Unauthorized - admin token required"
-          },
-          "404": {
-            "description": "Building not found"
           }
         },
         "tags": [
-          "buildings"
+          "admin-buildings"
         ]
       },
       "delete": {
-        "operationId": "BuildingsController_remove",
+        "operationId": "BuildingsAdminController_remove",
         "summary": "Soft-delete a building (admin only)",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Building ID (UUID)",
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "x-admin-key",
             "in": "header",
             "description": "Admin API key",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Building ID (UUID)",
             "schema": {
               "type": "string"
             }
@@ -394,19 +577,51 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Invalid UUID format"
-          },
-          "401": {
-            "description": "Unauthorized - admin token required"
-          },
-          "404": {
-            "description": "Building not found"
           }
         },
         "tags": [
-          "buildings"
+          "admin-buildings"
+        ]
+      }
+    },
+    "/v1/admin/buildings/{id}/publish": {
+      "post": {
+        "operationId": "BuildingsAdminController_publish",
+        "summary": "Publish or unpublish a building (admin only)",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "description": "Admin API key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Building ID (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Building status updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin-buildings"
         ]
       }
     },
@@ -431,6 +646,10 @@
   "tags": [
     {
       "name": "buildings",
+      "description": ""
+    },
+    {
+      "name": "admin-buildings",
       "description": ""
     }
   ],

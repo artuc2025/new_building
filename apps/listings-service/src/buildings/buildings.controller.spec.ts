@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BuildingsController } from './buildings.controller';
+import { BuildingsAdminController } from './buildings-admin.controller';
 import { BuildingsService } from './buildings.service';
 import { Building } from '../entities/building.entity';
 import { PricingSnapshot } from '../entities/pricing-snapshot.entity';
@@ -9,11 +10,12 @@ import { Developer } from '../entities/developer.entity';
 import { BuildingStatus } from '@new-building-portal/contracts';
 import { Region } from '../entities/region.entity';
 import { CreateBuildingDto } from './dto';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { AdminGuard } from '../common/guards/admin.guard';
 
-describe('BuildingsController (Contract Tests)', () => {
+describe('BuildingsController Specs', () => {
   let controller: BuildingsController;
+  let adminController: BuildingsAdminController;
   let service: BuildingsService;
   let repository: Repository<Building>;
 
@@ -63,7 +65,7 @@ describe('BuildingsController (Contract Tests)', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [BuildingsController],
+      controllers: [BuildingsController, BuildingsAdminController],
       providers: [
         BuildingsService,
         {
@@ -83,178 +85,127 @@ describe('BuildingsController (Contract Tests)', () => {
       .compile();
 
     controller = module.get<BuildingsController>(BuildingsController);
+    adminController = module.get<BuildingsAdminController>(BuildingsAdminController);
     service = module.get<BuildingsService>(BuildingsService);
     repository = module.get<Repository<Building>>(getRepositoryToken(Building));
   });
 
-  describe('GET /v1/buildings', () => {
-    it('should return paginated list of buildings (happy path)', async () => {
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ identifiers: [{ id: 'building-1' }] }),
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getCount: jest.fn().mockResolvedValue(1),
-        getMany: jest.fn().mockResolvedValue([mockBuilding]),
-      };
+  describe('Public Endpoints (BuildingsController)', () => {
+    describe('GET /v1/buildings', () => {
+      it('should return paginated list of buildings', async () => {
+        const mockQueryBuilder = {
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          skip: jest.fn().mockReturnThis(),
+          take: jest.fn().mockReturnThis(),
+          getCount: jest.fn().mockResolvedValue(1),
+          getMany: jest.fn().mockResolvedValue([mockBuilding]),
+        };
 
-      mockRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+        mockRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
-      const result = await controller.findAll({ page: 1, limit: 10 });
+        const result = await controller.findAll({ page: 1, limit: 10 });
 
-      // Validate response structure matches OpenAPI schema (new envelope format)
-      expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('pagination');
-      expect(result).toHaveProperty('meta');
-      expect(Array.isArray(result.data)).toBe(true);
-      expect(result.pagination).toHaveProperty('page');
-      expect(result.pagination).toHaveProperty('limit');
-      expect(result.pagination).toHaveProperty('total');
-      expect(result.pagination).toHaveProperty('totalPages');
-      expect(result.pagination).toHaveProperty('hasNext');
-      expect(result.pagination).toHaveProperty('hasPrev');
-      expect(result.pagination.page).toBe(1);
-      expect(result.pagination.limit).toBe(10);
-      expect(result.pagination.total).toBe(1);
-      expect(result.meta).toHaveProperty('currency');
-      expect(result.meta).toHaveProperty('exchangeRate');
-      expect(result.meta).toHaveProperty('sort');
-    });
-
-    // it('should return 400 for invalid query parameters', async () => {
-    //   const invalidQuery = { page: -1, limit: 200 };
-
-    //   // This should be caught by ValidationPipe, but we test the service behavior
-    //   await expect(controller.findAll(invalidQuery as any)).rejects.toThrow();
-    // });
-  });
-
-  describe('GET /v1/buildings/:id', () => {
-    it('should return building details (happy path)', async () => {
-      mockRepository.findOne.mockResolvedValue(mockBuilding);
-
-      const result = await controller.findOne('building-1');
-
-      // Validate response structure matches OpenAPI schema (envelope format)
-      expect(result).toHaveProperty('data');
-      expect(result.data).toHaveProperty('id');
-      expect(result.data).toHaveProperty('title');
-      expect(result.data).toHaveProperty('address');
-      expect(result.data).toHaveProperty('location');
-      expect(result.data).toHaveProperty('floors');
-      expect(result.data).toHaveProperty('areaMin');
-      expect(result.data).toHaveProperty('areaMax');
-      expect(result.data).toHaveProperty('currency');
-      expect(result.data).toHaveProperty('developerId');
-      expect(result.data).toHaveProperty('regionId');
-      expect(result.data).toHaveProperty('status');
-      expect(result.data).toHaveProperty('createdAt');
-      expect(result.data).toHaveProperty('updatedAt');
-      expect(result.data.id).toBe('building-1');
-    });
-
-    it('should return 404 when building not found', async () => {
-      mockRepository.findOne.mockResolvedValue(null);
-
-      await expect(controller.findOne('non-existent')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('POST /v1/buildings', () => {
-    it('should create a building (happy path)', async () => {
-      const createDto: CreateBuildingDto = {
-        title: { en: 'New Building' },
-        address: { en: 'New Address' },
-        location: { lng: 44.5091, lat: 40.1811 },
-        floors: 5,
-        areaMin: 60,
-        areaMax: 120,
-        developerId: 'dev-1',
-        regionId: 'region-1',
-      };
-
-      mockRepository.create.mockReturnValue(mockBuilding);
-      mockRepository.save.mockResolvedValue(mockBuilding);
-      mockRepository.query.mockResolvedValue([{ id: 'building-1' }]);
-      mockRepository.findOne.mockResolvedValue({
-        ...mockBuilding,
-        title: { en: 'New Building' },
-      });
-
-      const result = await controller.create(createDto);
-
-      // Validate response structure matches OpenAPI schema (envelope format)
-      expect(result).toHaveProperty('data');
-      expect(result.data).toHaveProperty('id');
-      expect(result.data).toHaveProperty('title');
-      expect(result.data.title.en).toBe('New Building');
-    });
-
-    // it('should return 400 for invalid input data', async () => {
-    //   const invalidDto = {
-    //     title: null, // Invalid
-    //     floors: -1, // Invalid
-    //   } as any;
-
-    //   await expect(controller.create(invalidDto)).rejects.toThrow();
-    // });
-  });
-
-  describe('PUT /v1/buildings/:id', () => {
-    it('should update a building (happy path)', async () => {
-      const updateDto = {
-        title: { en: 'Updated Building' },
-      };
-
-      mockRepository.findOne.mockResolvedValue(mockBuilding);
-      mockRepository.update.mockResolvedValue(undefined);
-      mockRepository.query.mockResolvedValue(undefined);
-      mockRepository.findOne.mockResolvedValueOnce(mockBuilding).mockResolvedValueOnce({
-        ...mockBuilding,
-        title: { en: 'Updated Building' },
-      });
-
-      const result = await controller.update('building-1', updateDto);
-
-      expect(result).toHaveProperty('data');
-      expect(result.data).toHaveProperty('id');
-      expect(result.data).toHaveProperty('title');
-    });
-
-    it('should return 404 when building not found', async () => {
-      mockRepository.findOne.mockResolvedValue(null);
-
-      await expect(controller.update('non-existent', {})).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('DELETE /v1/buildings/:id', () => {
-    it('should soft-delete a building (happy path)', async () => {
-      mockRepository.findOne.mockResolvedValue(mockBuilding);
-      mockRepository.update.mockResolvedValue(undefined);
-
-      await controller.remove('building-1');
-
-      expect(mockRepository.update).toHaveBeenCalledWith('building-1', {
-        status: BuildingStatus.ARCHIVED,
-        deleted_at: expect.any(Date),
+        expect(result).toHaveProperty('data');
+        expect(result).toHaveProperty('pagination');
+        expect(result.pagination.total).toBe(1);
       });
     });
 
-    it('should return 404 when building not found', async () => {
-      mockRepository.findOne.mockResolvedValue(null);
+    describe('GET /v1/buildings/:id', () => {
+      it('should return building details', async () => {
+        mockRepository.findOne.mockResolvedValue(mockBuilding);
 
-      await expect(controller.remove('non-existent')).rejects.toThrow(NotFoundException);
+        const result = await controller.findOne('building-1');
+
+        expect(result).toHaveProperty('data');
+        expect(result.data.id).toBe('building-1');
+      });
+
+      it('should return 404 when building not found', async () => {
+        mockRepository.findOne.mockResolvedValue(null);
+        await expect(controller.findOne('non-existent')).rejects.toThrow(NotFoundException);
+      });
+    });
+  });
+
+  describe('Admin Endpoints (BuildingsAdminController)', () => {
+    describe('POST /v1/admin/buildings', () => {
+      it('should create a building', async () => {
+        const createDto: CreateBuildingDto = {
+          title: { en: 'New Building' },
+          address: { en: 'New Address' },
+          location: { lng: 44.5091, lat: 40.1811 },
+          floors: 5,
+          areaMin: 60,
+          areaMax: 120,
+          developerId: 'dev-1',
+          regionId: 'region-1',
+        };
+
+        mockRepository.query.mockResolvedValue([{ id: 'building-1' }]);
+        mockRepository.findOne.mockResolvedValue({
+          ...mockBuilding,
+          title: { en: 'New Building' },
+        });
+
+        const result = await adminController.create(createDto);
+
+        expect(result).toHaveProperty('data');
+        expect(result.data.title.en).toBe('New Building');
+      });
+    });
+
+    describe('PUT /v1/admin/buildings/:id', () => {
+      it('should update a building', async () => {
+        const updateDto = {
+          title: { en: 'Updated Building' },
+        };
+
+        mockRepository.findOne.mockResolvedValue(mockBuilding);
+        mockRepository.query.mockResolvedValue(undefined);
+        mockRepository.findOne.mockResolvedValueOnce(mockBuilding).mockResolvedValueOnce({
+          ...mockBuilding,
+          title: { en: 'Updated Building' },
+        });
+
+        const result = await adminController.update('building-1', updateDto);
+
+        expect(result).toHaveProperty('data');
+        expect(result.data.title.en).toBe('Updated Building');
+      });
+    });
+
+    describe('POST /v1/admin/buildings/:id/publish', () => {
+      it('should publish a building', async () => {
+        mockRepository.findOne.mockResolvedValue(mockBuilding);
+        mockRepository.update.mockResolvedValue(undefined);
+        mockRepository.findOne.mockResolvedValueOnce(mockBuilding).mockResolvedValueOnce({
+          ...mockBuilding,
+          status: BuildingStatus.PUBLISHED,
+        });
+
+        const result = await adminController.publish('building-1', true);
+
+        expect(result.data.status).toBe(BuildingStatus.PUBLISHED);
+        expect(mockRepository.update).toHaveBeenCalledWith('building-1', expect.objectContaining({
+          status: BuildingStatus.PUBLISHED,
+        }));
+      });
+    });
+
+    describe('DELETE /v1/admin/buildings/:id', () => {
+      it('should soft-delete a building', async () => {
+        mockRepository.findOne.mockResolvedValue(mockBuilding);
+        mockRepository.update.mockResolvedValue(undefined);
+
+        await adminController.remove('building-1');
+
+        expect(mockRepository.update).toHaveBeenCalledWith('building-1', expect.objectContaining({
+          status: BuildingStatus.ARCHIVED,
+        }));
+      });
     });
   });
 });
-

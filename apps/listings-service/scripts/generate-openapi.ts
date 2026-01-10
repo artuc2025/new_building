@@ -6,6 +6,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { BuildingsController } from '../src/buildings/buildings.controller';
+import { BuildingsAdminController } from '../src/buildings/buildings-admin.controller';
 import { BuildingsService } from '../src/buildings/buildings.service';
 import { AdminGuard } from '../src/common/guards/admin.guard';
 import { SwaggerModule as AppSwaggerModule } from '../src/swagger/swagger.module';
@@ -26,7 +27,7 @@ async function generateOpenAPI() {
         }),
         AppSwaggerModule,
       ],
-      controllers: [BuildingsController],
+      controllers: [BuildingsController, BuildingsAdminController],
       providers: [
         {
           provide: BuildingsService,
@@ -35,6 +36,7 @@ async function generateOpenAPI() {
             findOne: () => {},
             create: () => {},
             update: () => {},
+            publish: () => {},
             remove: () => {},
           },
         },
@@ -70,6 +72,7 @@ async function generateOpenAPI() {
       .setDescription('API for managing building listings')
       .setVersion('1.0')
       .addTag('buildings')
+      .addTag('admin-buildings')
       .build();
     
     let document;

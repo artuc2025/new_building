@@ -277,6 +277,30 @@ export class BuildingsService {
     return this.findOne(id, currency, true);
   }
 
+  async publish(id: string, publish: boolean): Promise<BuildingResponseDto> {
+    const building = await this.buildingsRepository.findOne({
+      where: { id, deleted_at: null },
+    });
+
+    if (!building) {
+      throw new NotFoundException({
+        code: 'BUILDING_NOT_FOUND',
+        message: `Building with ID '${id}' not found`,
+        details: { buildingId: id },
+      });
+    }
+
+    const status = publish ? BuildingStatus.PUBLISHED : BuildingStatus.DRAFT;
+    const publishedAt = publish ? new Date() : null;
+
+    await this.buildingsRepository.update(id, {
+      status,
+      published_at: publishedAt,
+    });
+
+    return this.findOne(id, building.currency, true);
+  }
+
   async remove(id: string): Promise<{ data: { id: string; status: string; deletedAt: string } }> {
     const building = await this.buildingsRepository.findOne({
       where: { id, deleted_at: null },
@@ -387,6 +411,13 @@ export class BuildingsService {
       }
     }
 
+    // Currency conversion logic (Fixed exchange rate for now: 1 USD = 400 AMD)
+    const exchangeRate = currency === 'USD' ? 0.0025 : 1.0; // 1/400 = 0.0025
+    const convertPrice = (price?: number | string) => {
+      if (price === undefined || price === null) return undefined;
+      return Math.round(Number(price) * exchangeRate);
+    };
+
     // Transform to camelCase for API response
     return {
       id: building.id,
@@ -402,11 +433,11 @@ export class BuildingsService {
       totalUnits: building.total_units || undefined,
       commissioningDate: building.commissioning_date ? (building.commissioning_date instanceof Date ? building.commissioning_date.toISOString().split('T')[0] : building.commissioning_date) : undefined,
       constructionStatus: building.construction_status || undefined,
-      pricePerM2Min: building.price_per_m2_min ? Number(building.price_per_m2_min) : undefined,
-      pricePerM2Max: building.price_per_m2_max ? Number(building.price_per_m2_max) : undefined,
+      pricePerM2Min: convertPrice(building.price_per_m2_min),
+      pricePerM2Max: convertPrice(building.price_per_m2_max),
       areaMin: Number(building.area_min),
       areaMax: Number(building.area_max),
-      currency: building.currency,
+      currency,
       developerId: building.developer_id,
       regionId: building.region_id,
       status: building.status,

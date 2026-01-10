@@ -53,6 +53,13 @@
         "command": "tsx src/migration-cli/run.ts",
         "cwd": "{projectRoot}"
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter @new-building-portal/media-service test",
+        "cwd": "{projectRoot}"
+      }
     }
   },
   "tags": []
