@@ -112,6 +112,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET_BUILDINGS: ${MINIO_BUCKET_BUILDINGS:-buildings-media}
       MINIO_BUCKET_BLOG: ${MINIO_BUCKET_BLOG:-blog-media}
+      MINIO_BUCKET_RAW: ${MINIO_BUCKET_RAW:-raw}
     depends_on:
       minio:
         condition: service_started
@@ -123,6 +124,7 @@ services:
       /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
       /usr/bin/mc mb myminio/$${MINIO_BUCKET_BUILDINGS:-buildings-media} --ignore-existing;
       /usr/bin/mc mb myminio/$${MINIO_BUCKET_BLOG:-blog-media} --ignore-existing;
+      /usr/bin/mc mb myminio/$${MINIO_BUCKET_RAW:-raw} --ignore-existing;
       /usr/bin/mc anonymous set download myminio/$${MINIO_BUCKET_BUILDINGS:-buildings-media};
       /usr/bin/mc anonymous set download myminio/$${MINIO_BUCKET_BLOG:-blog-media};
       exit 0;

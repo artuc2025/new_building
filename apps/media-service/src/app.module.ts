@@ -1,11 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppDataSource } from './data-source';
+import { MediaController } from './controllers/media.controller';
+import { StorageService, ImageProcessorService, EventService, MediaService } from './services';
+import { Asset, ProcessingJob } from './entities';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
+    }),
     TypeOrmModule.forRootAsync({
       useFactory: () => {
         const host = process.env.MEDIA_DB_HOST || 'localhost';
@@ -31,8 +36,9 @@ import { AppDataSource } from './data-source';
         };
       },
     }),
+    TypeOrmModule.forFeature([Asset, ProcessingJob]),
   ],
-  controllers: [],
-  providers: [],
+  controllers: [MediaController],
+  providers: [StorageService, ImageProcessorService, EventService, MediaService],
 })
 export class AppModule {}
