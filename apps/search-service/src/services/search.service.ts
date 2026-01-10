@@ -163,10 +163,14 @@ export class SearchService {
       // Query PostGIS: find points within bounding box
       // Note: PostGIS GEOGRAPHY uses (lng, lat) order
       // Cast geography to geometry for ST_Within comparison (same pattern as listings service)
+      // Use ST_AsText to explicitly get WKT format for reliable parsing
       let locations;
       try {
         locations = await this.buildingLocationRepository
           .createQueryBuilder('bl')
+          .select('bl.buildingId', 'buildingId')
+          .addSelect('ST_AsText(bl.location)', 'location_text')
+          .addSelect('bl.metadata', 'metadata')
           .where(
             `ST_Within(
               bl.location::geometry,
@@ -182,7 +186,7 @@ export class SearchService {
               northEastLat,
             },
           )
-          .getMany();
+          .getRawMany();
       } catch (dbError: any) {
         this.logger.error('PostGIS query failed:', dbError);
         this.logger.error('Query parameters:', { southWestLng, southWestLat, northEastLng, northEastLat });
@@ -216,8 +220,8 @@ export class SearchService {
 
       // Transform results
       const results: MapBuildingPoint[] = locations.map((loc) => {
-        // Parse PostGIS WKT: "POINT(lng lat)"
-        const pointMatch = loc.location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+        // Parse PostGIS WKT from ST_AsText: "POINT(lng lat)"
+        const pointMatch = loc.location_text?.match(/POINT\(([^ ]+) ([^ ]+)\)/);
         const lng = pointMatch ? parseFloat(pointMatch[1]) : 0;
         const lat = pointMatch ? parseFloat(pointMatch[2]) : 0;
 

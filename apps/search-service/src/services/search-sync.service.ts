@@ -15,7 +15,7 @@ interface BuildingEvent {
     title?: Record<string, string>;
     address?: Record<string, string>;
     description?: Record<string, string>;
-    location?: string; // WKT format: "POINT(lng lat)"
+    location?: { lat: number; lng: number }; // JSON object from events (see README 6.2.1)
     pricePerM2Min?: number;
     pricePerM2Max?: number;
     areaMin?: number;
@@ -244,6 +244,7 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
     const { payload } = event;
 
     // Action A: Update Meilisearch index
+    // Pass the location JSON object directly to Meilisearch (no conversion needed)
     const meilisearchDocument = {
       buildingId: payload.id,
       title: payload.title || {},
@@ -259,7 +260,7 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
       developerName: payload.developerName || {},
       regionId: payload.regionId,
       regionName: payload.regionName || {},
-      location: this.parseLocation(payload.location),
+      location: payload.location, // Pass JSON object directly to Meilisearch
       status: payload.status || 'draft',
       updatedAt: payload.updatedAt || new Date().toISOString(),
     };
@@ -268,7 +269,8 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
 
     // Action B: Upsert building_locations read-model
     if (payload.location) {
-      const location = this.parseLocation(payload.location);
+      // Convert JSON { lat, lng } to WKT for PostgreSQL GEOGRAPHY storage
+      const wktLocation = this.convertToWKT(payload.location);
       const metadata = {
         price: payload.pricePerM2Min,
         title: payload.title,
@@ -278,7 +280,7 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
       await this.buildingLocationRepository.upsert(
         {
           buildingId: payload.id,
-          location: payload.location, // Keep as WKT for PostGIS
+          location: wktLocation, // Store as WKT for PostGIS GEOGRAPHY column
           metadata,
         },
         ['buildingId'],
@@ -304,21 +306,13 @@ export class SearchSyncService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Parse PostGIS WKT location to {lat, lng} object.
+   * Convert JSON location object to PostGIS WKT format.
+   * @param location - JSON object { lat: number; lng: number }
+   * @returns WKT string "POINT(lng lat)" for PostGIS GEOGRAPHY storage
    */
-  private parseLocation(location?: string): { lat: number; lng: number } | null {
-    if (!location) return null;
-
-    // Parse WKT: "POINT(lng lat)"
-    const match = location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
-    if (match) {
-      return {
-        lng: parseFloat(match[1]),
-        lat: parseFloat(match[2]),
-      };
-    }
-
-    return null;
+  private convertToWKT(location: { lat: number; lng: number }): string {
+    // PostGIS uses (longitude, latitude) order for POINT
+    return `POINT(${location.lng} ${location.lat})`;
   }
 
   /**
