@@ -2,8 +2,9 @@
 export default defineNuxtConfig({
   devtools: { enabled: true },
   devServer: {
-    port: 3001,
+    port: 3006,
   },
+  modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss'],
   runtimeConfig: {
     public: {
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api',
@@ -12,5 +13,6 @@ export default defineNuxtConfig({
   typescript: {
     strict: true,
   },
+  css: ['~/assets/css/main.css'],
 });
 

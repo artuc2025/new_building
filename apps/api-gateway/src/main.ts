@@ -16,7 +16,7 @@ async function bootstrap() {
   const listingsServiceUrl = configService.get<string>('LISTINGS_SERVICE_URL', 'http://localhost:3001');
   
   const port = configService.get<number>('API_GATEWAY_PORT', 3000);
-  const corsOrigin = configService.get<string>('API_GATEWAY_CORS_ORIGIN', 'http://localhost:3001');
+  const corsOrigin = configService.get<string>('API_GATEWAY_CORS_ORIGIN', 'http://localhost:3006');
 
   // Global validation pipe (for gateway-level validation if needed)
   app.useGlobalPipes(
@@ -30,9 +30,33 @@ async function bootstrap() {
   // Global exception filter for error normalization
   app.useGlobalFilters(new HttpExceptionFilter());
 
+  // CORS configuration - support multiple origins for development
+  const allowedOrigins = corsOrigin.split(',').map(origin => origin.trim());
+  const isDevelopment = configService.get<string>('NODE_ENV', 'development') === 'development';
+
   app.enableCors({
-    origin: corsOrigin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, Postman, etc.) in development
+      if (!origin && isDevelopment) {
+        return callback(null, true);
+      }
+
+      // In development, allow all localhost origins for easier debugging
+      if (isDevelopment && origin && origin.startsWith('http://localhost:')) {
+        return callback(null, true);
+      }
+
+      // Check if origin is in allowed list
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key', 'Accept'],
+    exposedHeaders: ['Content-Range', 'X-Total-Count'],
   });
 
   // OpenAPI/Swagger setup
