@@ -1,11 +1,24 @@
 import { defineStore } from 'pinia';
-import type { Building, BuildingFilters, PaginationMeta } from '~/types/building';
+import type { BuildingResponseDto, PaginationMetaDto } from '~/api/client';
+
+export interface BuildingFilters {
+  price_min?: number;
+  price_max?: number;
+  area_min?: number;
+  area_max?: number;
+  region_id?: string;
+  developer_id?: string;
+  sort?: 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc' | 'area_asc' | 'area_desc';
+  page?: number;
+  limit?: number;
+  currency?: 'AMD' | 'USD';
+}
 
 interface BuildingsState {
-  buildings: Building[];
+  buildings: BuildingResponseDto[];
   loading: boolean;
   error: string | null;
-  pagination: PaginationMeta | null;
+  pagination: PaginationMetaDto | null;
   filters: BuildingFilters;
 }
 
@@ -19,6 +32,7 @@ export const useBuildingsStore = defineStore('buildings', {
       page: 1,
       limit: 20,
       sort: 'date_desc',
+      currency: 'AMD',
     },
   }),
 
@@ -26,11 +40,11 @@ export const useBuildingsStore = defineStore('buildings', {
     hasBuildings: (state): boolean => state.buildings.length > 0,
     hasNextPage: (state): boolean => {
       if (!state.pagination) return false;
-      return state.pagination.page < state.pagination.totalPages;
+      return state.pagination.hasNext;
     },
     hasPrevPage: (state): boolean => {
       if (!state.pagination) return false;
-      return state.pagination.page > 1;
+      return state.pagination.hasPrev;
     },
     currentPage: (state): number => state.filters.page || 1,
     totalPages: (state): number => state.pagination?.totalPages || 0,
@@ -53,6 +67,7 @@ export const useBuildingsStore = defineStore('buildings', {
         page: 1,
         limit: 20,
         sort: 'date_desc',
+        currency: 'AMD',
       };
     },
 
@@ -73,7 +88,7 @@ export const useBuildingsStore = defineStore('buildings', {
     /**
      * Set buildings data and pagination
      */
-    setBuildings(buildings: Building[], pagination: PaginationMeta) {
+    setBuildings(buildings: BuildingResponseDto[], pagination: PaginationMetaDto) {
       this.buildings = buildings;
       this.pagination = pagination;
     },

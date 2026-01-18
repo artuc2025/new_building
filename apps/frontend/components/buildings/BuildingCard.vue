@@ -1,147 +1,71 @@
+
 <script setup lang="ts">
-import type { Building } from '~/types/building';
+import type { BuildingResponseDto } from '~/api/client';
 
-interface Props {
-  building: Building;
-}
+const props = defineProps<{
+    building: BuildingResponseDto;
+}>();
 
-const props = defineProps<Props>();
+const locale = 'am'; // Hardcoded for MVP, will use useI18n later
 
-/**
- * Get localized text from multi-language object
- */
-const getLocalizedText = (text: { am: string; ru: string; en: string }, locale: string = 'en'): string => {
-  return text[locale as keyof typeof text] || text.en || text.am || text.ru || '';
+// Hepler to safe get localized string
+const getLocalizedValue = (obj: any) => {
+    return obj?.[locale] || Object.values(obj || {})[0] || '';
 };
 
-/**
- * Format price range nicely
- */
-const formatPriceRange = (min: number, max: number): string => {
-  const formatNumber = (num: number): string => {
-    return new Intl.NumberFormat('en-US').format(num);
-  };
-  
-  if (min === max) {
-    return `${formatNumber(min)} AMD/m²`;
-  }
-  return `${formatNumber(min)} - ${formatNumber(max)} AMD/m²`;
+const title = computed(() => getLocalizedValue(props.building.title));
+const address = computed(() => getLocalizedValue(props.building.address));
+const formatPrice = (price: number) => {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: props.building.currency || 'AMD' }).format(price);
 };
 
-/**
- * Format area range
- */
-const formatAreaRange = (min: number, max: number): string => {
-  if (min === max) {
-    return `${min} m²`;
-  }
-  return `${min} - ${max} m²`;
-};
-
-// Get current locale (default to 'en' for now, can be enhanced with i18n)
-const locale = 'en'; // TODO: Replace with useI18n().locale.value when i18n is set up
-
-const title = computed(() => getLocalizedText(props.building.title, locale));
-const address = computed(() => getLocalizedText(props.building.address, locale));
-const developerName = computed(() => getLocalizedText(props.building.developer.name, locale));
-const priceRange = computed(() => formatPriceRange(props.building.pricePerM2Min, props.building.pricePerM2Max));
-const areaRange = computed(() => formatAreaRange(props.building.areaMin, props.building.areaMax));
-
-const handleCardClick = () => {
-  navigateTo(`/buildings/${props.building.id}`);
-};
 </script>
 
 <template>
-  <div
-    class="building-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200"
-    @click="handleCardClick"
-  >
-    <!-- Image -->
-    <div class="building-card__image relative h-48 bg-gray-200 overflow-hidden">
-      <NuxtImg
-        v-if="building.primaryImage?.thumbnailUrl"
-        :src="building.primaryImage.thumbnailUrl"
-        :alt="title"
-        class="w-full h-full object-cover"
-        loading="lazy"
-      />
-      <div v-else class="w-full h-full flex items-center justify-center bg-gray-300">
-        <svg
-          class="w-16 h-16 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-          />
-        </svg>
-      </div>
+    <div class="group relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300">
+        <!-- Image -->
+        <div class="aspect-w-16 aspect-h-9 bg-gray-200 group-hover:opacity-90 transition-opacity overflow-hidden h-48">
+            <div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                <span class="i-heroicons-photo w-12 h-12"></span>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="p-4">
+            <h3 class="text-lg font-semibold text-gray-900 truncate" :title="title">
+                {{ title }}
+            </h3>
+            
+            <p class="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                <span class="i-heroicons-map-pin w-4 h-4"></span>
+                {{ address }}
+            </p>
+
+            <div class="mt-4 flex items-baseline justify-between">
+                <div>
+                     <p class="text-xs text-gray-500">Price per m²</p>
+                     <p class="text-base font-medium text-primary-600">
+                        {{ formatPrice(Number(building.pricePerM2Min) || 0) }} 
+                        <span v-if="building.pricePerM2Max"> - {{ formatPrice(Number(building.pricePerM2Max) || 0) }}</span>
+                     </p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500">Area</p>
+                    <p class="text-sm font-medium text-gray-900">
+                        {{ building.areaMin }} - {{ building.areaMax }} m²
+                    </p>
+                </div>
+            </div>
+
+             <div class="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                 <span>{{ building.floors }} Floors</span>
+                 <span>Completed: {{ building.commissioningDate ? new Date(building.commissioningDate as string).getFullYear() : 'N/A' }}</span>
+             </div>
+        </div>
+        
+        <!-- Link overlay -->
+        <NuxtLink :to="`/buildings/${building.id}`" class="absolute inset-0">
+            <span class="sr-only">View details for {{ title }}</span>
+        </NuxtLink>
     </div>
-
-    <!-- Content -->
-    <div class="building-card__content p-4">
-      <!-- Title -->
-      <h3 class="building-card__title text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-        {{ title }}
-      </h3>
-
-      <!-- Address -->
-      <p class="building-card__address text-sm text-gray-600 mb-3 line-clamp-1">
-        {{ address }}
-      </p>
-
-      <!-- Price Range -->
-      <div class="building-card__price mb-2">
-        <span class="text-base font-bold text-blue-600">{{ priceRange }}</span>
-      </div>
-
-      <!-- Area Range -->
-      <div class="building-card__area mb-2">
-        <span class="text-sm text-gray-700">Area: {{ areaRange }}</span>
-      </div>
-
-      <!-- Developer -->
-      <div class="building-card__developer text-sm text-gray-600">
-        <span class="font-medium">Developer:</span>
-        <span class="ml-1">{{ developerName }}</span>
-      </div>
-
-      <!-- Additional Info -->
-      <div class="building-card__meta mt-3 pt-3 border-t border-gray-200 flex justify-between text-xs text-gray-500">
-        <span>{{ building.floors }} {{ building.floors === 1 ? 'floor' : 'floors' }}</span>
-        <span v-if="building.commissioningDate">
-          {{ new Date(building.commissioningDate).getFullYear() }}
-        </span>
-      </div>
-    </div>
-  </div>
 </template>
-
-<style scoped>
-.building-card {
-  transition: transform 0.2s ease;
-}
-
-.building-card:hover {
-  transform: translateY(-2px);
-}
-
-.line-clamp-1 {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-</style>

@@ -55,3 +55,7 @@ backups/
 # Review artifacts (generated files)
 .review/*
 !.review/README.md
+
+# Agent
+.agent
+
