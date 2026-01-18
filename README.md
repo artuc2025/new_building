@@ -4327,6 +4327,7 @@ docker-compose down -v
 | `CONTENT_SERVICE_PORT` | content-service | Service port | `3004` | ✅ |
 | `ANALYTICS_SERVICE_PORT` | analytics-service | Service port | `3005` | ✅ |
 | `IMAGE_PROCESSOR_PORT` | image-processor | Worker port | `3006` | ✅ |
+| `FRONTEND_PORT` | frontend | Web Application | `3007` | ✅ |
 | **Security** |
 | `JWT_SECRET` | api-gateway, services | JWT signing secret | `change-in-prod` | ✅ |
 | `JWT_EXPIRES_IN` | api-gateway, services | JWT expiration | `1h` | ✅ |
@@ -4390,7 +4391,7 @@ pnpm nx run-many --target=serve --projects=api-gateway,listings-service,search-s
 pnpm nx serve frontend
 
 # 9. Access services:
-# - Frontend: http://localhost:3001
+# - Frontend: http://localhost:3007
 # - API Gateway: http://localhost:3000
 # - Grafana: http://localhost:3001 (admin/admin)
 # - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
