@@ -17,7 +17,7 @@
 - SSR + SEO optimization required
 - Multi-language support (AM/RU/EN)
 
-**Architecture Decision:** [See Section 2 for recommendation]
+**Architecture Decision:** Microservices (Option B) - Implemented via Nx Monorepo
 
 **Key Services (Target):** API Gateway, Listings, Search, Media, Content, Analytics, Auth (optional)
 
@@ -140,33 +140,19 @@ Deploy separate NestJS services from the start: API Gateway, Listings Service, S
 - Infrastructure: Multiple containers/VPS instances (minimum 2-3 services per instance, or separate instances for critical services)
 - Ongoing: Higher operational overhead, more complex monitoring and debugging
 
-### Recommendation: **Option A - Modular Monolith First**
+### Selected Architecture: **Option B - Microservices from Day 1**
 
 **Justification:**
+1.  **Strict Boundaries:** Starting with microservices ensures no accidental coupling between domains (e.g., Listings vs Search).
+2.  **Scalability:** Allows independent scaling of resource-intensive services (like Search or Media processing) from day one.
+3.  **Modern Tooling:** Using Nx Monorepo mitigates the management overhead, making multi-app development efficient.
 
-1. **Team Size & Timeline:** With a small team (2-4 backend devs) and a 3-4 month MVP timeline, a modular monolith allows faster iteration and fewer coordination overheads. Microservices would require significant upfront investment in infrastructure and cross-cutting concerns.
-
-2. **Traffic Expectations:** For MVP scale (<10K daily active users), a well-structured monolith can handle the load efficiently. Premature optimization (microservices) adds complexity without immediate benefit.
-
-3. **Risk Mitigation:** The modular monolith approach reduces risk of over-engineering while maintaining a clear path to microservices. If traffic grows or team expands, services can be extracted incrementally.
-
-4. **Cost Efficiency:** Lower initial infrastructure and operational costs allow focus on feature development rather than distributed systems complexity.
-
-5. **Maintainability Focus:** The requirement emphasizes "correctness and long-term maintainability." A modular monolith with clear boundaries is easier to maintain initially, and the extraction path is well-documented.
-
-**Migration Path to Microservices (North Star):**
-
-When to consider extraction:
-- Traffic exceeds 50K+ daily active users
-- Team grows to 8+ backend developers
-- Specific services need independent scaling (e.g., Search service under heavy load)
-- Need for technology diversity (e.g., Python service for ML features)
-
-Extraction strategy:
-1. Start with stateless services (Search, Media) - easier to extract
-2. Extract read-heavy services next (Content, Analytics)
-3. Finally extract write-heavy services (Listings) with careful transaction boundary planning
-4. Maintain API Gateway pattern throughout to abstract service boundaries from clients
+**Implementation Status:**
+- `apps/api-gateway`: Main entry point.
+- `apps/listings-service`: Core real estate logic.
+- `apps/search-service`: Search engine integration.
+- `apps/media-service`: File handling.
+- `apps/frontend`: Nuxt 3 Client.
 
 **Target Microservices Design (North Star):**
 
@@ -192,7 +178,7 @@ Each service will have:
 
 ### Service Overview
 
-The target architecture consists of 6-7 services (with Auth as optional). In the modular monolith phase, these will be implemented as NestJS modules with clear boundaries, ready for extraction.
+The target architecture consists of 6-7 services (with Auth as optional). These are implemented as separate NestJS applications within an Nx workspace / Monorepo.
 
 ### 3.1 API Gateway / BFF (Backend for Frontend)
 

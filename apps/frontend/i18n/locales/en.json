@@ -1,0 +1,30 @@
+{
+    "common": {
+        "apply": "Apply",
+        "reset": "Reset",
+        "min": "Min",
+        "max": "Max",
+        "loading": "Loading...",
+        "error": "Error"
+    },
+    "buildings": {
+        "title": "New Buildings",
+        "showing_results": "Showing {from} - {to} of {total} results",
+        "filters": {
+            "title": "Filters",
+            "price_per_m2": "Price per m²",
+            "area_m2": "Area (m²)",
+            "region": "Region",
+            "any_region": "Any Region"
+        },
+        "sort": {
+            "label": "Sort by",
+            "newest_first": "Newest First",
+            "oldest_first": "Oldest First",
+            "price_asc": "Price: Low to High",
+            "price_desc": "Price: High to Low",
+            "area_desc": "Area: Large to Small",
+            "area_asc": "Area: Small to Large"
+        }
+    }
+}

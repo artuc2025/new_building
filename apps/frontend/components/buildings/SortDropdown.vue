@@ -8,14 +8,16 @@ const emit = defineEmits<{
     (e: 'update:modelValue', value: string): void;
 }>();
 
-const sortOptions = [
-    { label: 'Newest First', value: 'date_desc' },
-    { label: 'Oldest First', value: 'date_asc' },
-    { label: 'Price: Low to High', value: 'price_asc' },
-    { label: 'Price: High to Low', value: 'price_desc' },
-    { label: 'Area: Large to Small', value: 'area_desc' },
-    { label: 'Area: Small to Large', value: 'area_asc' },
-];
+const { t } = useI18n();
+
+const sortOptions = computed(() => [
+    { label: t('buildings.sort.newest_first'), value: 'date_desc' },
+    { label: t('buildings.sort.oldest_first'), value: 'date_asc' },
+    { label: t('buildings.sort.price_asc'), value: 'price_asc' },
+    { label: t('buildings.sort.price_desc'), value: 'price_desc' },
+    { label: t('buildings.sort.area_desc'), value: 'area_desc' },
+    { label: t('buildings.sort.area_asc'), value: 'area_asc' },
+]);
 
 const updateSort = (event: Event) => {
     const target = event.target as HTMLSelectElement;
@@ -25,7 +27,7 @@ const updateSort = (event: Event) => {
 
 <template>
     <div class="flex items-center gap-2">
-        <label for="sort" class="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by</label>
+        <label for="sort" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ $t('buildings.sort.label') }}</label>
         <select
             id="sort"
             :value="modelValue"

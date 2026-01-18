@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@nuxt/devtools": "latest",
+    "@nuxtjs/i18n": "^10.2.1",
     "@pinia/nuxt": "^0.11.3",
     "nuxt": "^3.10.0",
     "pinia": "^3.0.4"

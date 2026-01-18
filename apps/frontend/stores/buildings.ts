@@ -20,6 +20,7 @@ interface BuildingsState {
   error: string | null;
   pagination: PaginationMetaDto | null;
   filters: BuildingFilters;
+  lastUpdated: number | null;
 }
 
 export const useBuildingsStore = defineStore('buildings', {
@@ -34,6 +35,7 @@ export const useBuildingsStore = defineStore('buildings', {
       sort: 'date_desc',
       currency: 'AMD',
     },
+    lastUpdated: null,
   }),
 
   getters: {
@@ -91,6 +93,7 @@ export const useBuildingsStore = defineStore('buildings', {
     setBuildings(buildings: BuildingResponseDto[], pagination: PaginationMetaDto) {
       this.buildings = buildings;
       this.pagination = pagination;
+      this.lastUpdated = Date.now();
     },
 
     /**
@@ -100,6 +103,7 @@ export const useBuildingsStore = defineStore('buildings', {
       this.buildings = [];
       this.pagination = null;
       this.error = null;
+      this.lastUpdated = null;
     },
   },
 });

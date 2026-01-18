@@ -51,11 +51,13 @@ onMounted(() => {
                     <!-- Header & Sort -->
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <div>
-                             <h1 class="text-2xl font-bold text-gray-900">New Buildings</h1>
+                             <h1 class="text-2xl font-bold text-gray-900">{{ $t('buildings.title') }}</h1>
                              <p class="text-gray-500 mt-1" v-if="pagination">
-                                Showing {{ (pagination.page - 1) * pagination.limit + 1 }} - 
-                                {{ Math.min(pagination.page * pagination.limit, pagination.total) }} 
-                                of {{ pagination.total }} results
+                                {{ $t('buildings.showing_results', {
+                                    from: (pagination.page - 1) * pagination.limit + 1,
+                                    to: Math.min(pagination.page * pagination.limit, pagination.total),
+                                    total: pagination.total
+                                }) }}
                              </p>
                         </div>
                         

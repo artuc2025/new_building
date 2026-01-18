@@ -5,7 +5,7 @@ import type { BuildingFilters } from '~/stores/buildings';
 
 export const useBuildings = () => {
   const store = useBuildingsStore();
-  const { buildings, loading, error, pagination, filters } = storeToRefs(store);
+  const { buildings, loading, error, pagination, filters, lastUpdated } = storeToRefs(store);
   const api = useApi();
 
   const fetchBuildings = async () => {
@@ -39,10 +39,13 @@ export const useBuildings = () => {
   };
 
   /**
-   * Initial fetch if empty
+   * Initial fetch if empty or stale (older than 5 minutes)
    */
-  const init = () => {
-    if (!store.hasBuildings) {
+  const init = (force = false) => {
+    const STALE_TIME = 5 * 60 * 1000; // 5 minutes
+    const isStale = !lastUpdated.value || (Date.now() - lastUpdated.value > STALE_TIME);
+
+    if (force || !store.hasBuildings || isStale) {
       fetchBuildings();
     }
   };
