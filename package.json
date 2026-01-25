@@ -6,7 +6,8 @@
   "scripts": {
     "review:bundle": "tsx scripts/review-bundle.ts",
     "review:delta": "bash ./scripts/review_delta_artifacts.sh",
-    "review:anchor:update": "echo 'To update anchor after Tech Lead approval, run: git rev-parse HEAD > .review/anchor.sha'"
+    "review:anchor:update": "echo 'To update anchor after Tech Lead approval, run: git rev-parse HEAD > .review/anchor.sha'",
+    "start:all": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1"
   },
   "devDependencies": {
     "@nx/devkit": "19.0.0",
@@ -27,4 +28,3 @@
     }
   }
 }
-

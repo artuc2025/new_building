@@ -59,4 +59,4 @@ while (-not $postgresReady -and $pgRetries -lt 30) {
 
 Write-Host "`n4. Starting Nx Apps (Frontend, API Gateway, Listings Service)..."
 # Using Start-Process to run in same window if possible or just execute
-npx nx run-many --target=serve --projects=listings-service,api-gateway,frontend --parallel=3
+npx nx run-many --target=serve --projects=api-gateway,listings-service,search-service,media-service,content-service,analytics-service,frontend --parallel=10
