@@ -30,7 +30,7 @@ export class ListingsController {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   private getListingsServiceUrl(): string {
     return (
@@ -106,12 +106,12 @@ export class ListingsController {
                 // Forward error response from upstream service (already in README format)
                 const status = error.response.status;
                 const data = error.response.data as any;
-                
+
                 // If upstream already has error envelope, forward it
                 if (data?.error) {
                   throw new HttpException(data, status);
                 }
-                
+
                 // Otherwise, normalize to README format
                 const requestId = data?.error?.requestId || req.headers['x-request-id'] as string || 'unknown';
                 throw new HttpException(
@@ -149,12 +149,12 @@ export class ListingsController {
       // Handle non-2xx status codes
       if (response.status >= 400) {
         const errorData = response.data || {};
-        
+
         // If upstream already has error envelope, forward it
         if (errorData.error) {
           throw new HttpException(errorData, response.status);
         }
-        
+
         // Otherwise, normalize to README format
         const requestId = errorData.error?.requestId || req.headers['x-request-id'] as string || 'unknown';
         throw new HttpException(
@@ -263,6 +263,7 @@ export class ListingsController {
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 503, description: 'Service unavailable' })
   async findAll(@Req() req: Request): Promise<PaginatedBuildingsResponseDto> {
+    console.log('API-Gateway: findAll called with query:', req.query);
     // Public endpoints: enforce published-only status
     // If status is provided, validate it's 'published', otherwise default to 'published'
     const query = { ...(req.query as Record<string, any>) };
@@ -284,7 +285,10 @@ export class ListingsController {
     query.status = BuildingStatus.PUBLISHED;
     const queryString = this.buildQueryString(query);
     const path = `/v1/buildings${queryString ? `?${queryString}` : ''}`;
-    return this.proxyRequest('GET', path, req);
+    console.log('API-Gateway: proxying to listings-service:', path);
+    const result = await this.proxyRequest('GET', path, req);
+    console.log('API-Gateway: received response from listings-service');
+    return result;
   }
 
   @Get(':id')
@@ -309,7 +313,7 @@ export class ListingsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new building (admin only)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
-  @ApiBody({ 
+  @ApiBody({
     description: 'Building data',
     schema: {
       type: 'object',
@@ -330,7 +334,7 @@ export class ListingsController {
   @ApiOperation({ summary: 'Update building by ID (admin only)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
-  @ApiBody({ 
+  @ApiBody({
     description: 'Updated building data',
     schema: {
       type: 'object',
@@ -382,7 +386,7 @@ export class ListingsController {
   @ApiOperation({ summary: 'Delete building by ID (admin only)' })
   @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
   @ApiParam({ name: 'id', description: 'Building ID (UUID)', type: String })
-  @ApiOkResponse({ 
+  @ApiOkResponse({
     description: 'Building deleted successfully',
     schema: {
       type: 'object',

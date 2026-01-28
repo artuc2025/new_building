@@ -21,7 +21,7 @@ import { PaginatedBuildingsResponseDto, BuildingEnvelopeDto } from '@new-buildin
 @ApiTags('buildings')
 @Controller('v1/buildings')
 export class BuildingsController {
-  constructor(private readonly buildingsService: BuildingsService) {}
+  constructor(private readonly buildingsService: BuildingsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get paginated list of buildings (public)' })
@@ -32,8 +32,11 @@ export class BuildingsController {
   })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   async findAll(@Query() query: PublicListBuildingsQueryDto) {
+    console.log('Listings-Service: findAll called with query:', query);
     // Public endpoints only return published buildings
-    return this.buildingsService.findAll(query as any, false);
+    const result = await this.buildingsService.findAll(query as any, false);
+    console.log('Listings-Service: findAll returning', result.data.length, 'buildings');
+    return result;
   }
 
   @Get(':id')

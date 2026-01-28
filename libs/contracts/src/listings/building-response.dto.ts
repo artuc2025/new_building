@@ -96,5 +96,11 @@ export class BuildingResponseDto {
 
   @ApiProperty({ description: 'Created by user ID (UUID)', required: false, nullable: true })
   createdBy?: string | null;
+
+  @ApiProperty({ description: 'Developer details', required: false })
+  developer?: {
+    id: string;
+    name: Record<string, string>;
+  };
 }
 

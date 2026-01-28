@@ -9,12 +9,12 @@ import { SwaggerDocument } from './swagger/swagger.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   const configService = app.get(ConfigService);
-  
+
   // Get environment variables with defaults
   const listingsServiceUrl = configService.get<string>('LISTINGS_SERVICE_URL', 'http://localhost:3001');
-  
+
   const port = configService.get<number>('API_GATEWAY_PORT', 3000);
   const corsOrigin = configService.get<string>('API_GATEWAY_CORS_ORIGIN', 'http://localhost:3006');
 
@@ -36,13 +36,14 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
+      console.log('API-Gateway: Incoming request from origin:', origin);
       // Allow requests with no origin (like mobile apps, Postman, etc.) in development
       if (!origin && isDevelopment) {
         return callback(null, true);
       }
 
-      // In development, allow all localhost origins for easier debugging
-      if (isDevelopment && origin && origin.startsWith('http://localhost:')) {
+      // In development, allow all localhost and 127.0.0.1 origins for easier debugging
+      if (isDevelopment && origin && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
         return callback(null, true);
       }
 

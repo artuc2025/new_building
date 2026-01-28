@@ -33,7 +33,7 @@ export class BuildingsService {
     @InjectRepository(PricingSnapshot)
     private pricingSnapshotRepository: Repository<PricingSnapshot>,
     private eventService: EventService,
-  ) {}
+  ) { }
 
   async findAll(query: ListBuildingsQueryDto, isAdmin: boolean = false): Promise<PaginatedBuildingsResponseDto> {
     const page = query.page || 1;
@@ -99,7 +99,7 @@ export class BuildingsService {
 
   async findOne(id: string, currency: string = 'AMD', isAdmin: boolean = false): Promise<BuildingResponseDto> {
     const where: any = { id };
-    
+
     // Admin can see all buildings including soft-deleted ones
     // Public endpoints only see published, non-deleted buildings
     if (!isAdmin) {
@@ -109,6 +109,7 @@ export class BuildingsService {
 
     const building = await this.buildingsRepository.findOne({
       where,
+      relations: ['developer'],
     });
 
     if (!building) {
@@ -161,11 +162,11 @@ export class BuildingsService {
     // Use Raw SQL to insert to avoid "unknown GeoJSON type" error with TypeORM/pg
     // Prepare columns and values
     delete buildingData.location; // Handle location manually
-    
+
     const columns = Object.keys(buildingData);
     const values = columns.map(col => buildingData[col]);
     const placeholders = values.map((_, i) => `$${i + 1}`);
-    
+
     let locationVal = 'DEFAULT';
     if (createDto.location) {
       locationVal = `ST_SetSRID(ST_MakePoint(${createDto.location.lng}, ${createDto.location.lat}), 4326)`;
@@ -181,7 +182,7 @@ export class BuildingsService {
     const savedId = result[0].id;
     const currency = createDto.currency || 'AMD';
     const building = await this.findOne(savedId, currency, true);
-    
+
     // Publish event
     await this.eventService.publishBuildingCreated({
       id: building.id,
@@ -200,7 +201,7 @@ export class BuildingsService {
       status: building.status,
       updatedAt: typeof building.updatedAt === 'string' ? building.updatedAt : building.updatedAt?.toISOString(),
     });
-    
+
     return building;
   }
 
@@ -223,8 +224,8 @@ export class BuildingsService {
     const currentPriceMax = building.price_per_m2_max ? Number(building.price_per_m2_max) : null;
     const newPriceMin = updateDto.pricePerM2Min !== undefined ? Number(updateDto.pricePerM2Min) : currentPriceMin;
     const newPriceMax = updateDto.pricePerM2Max !== undefined ? Number(updateDto.pricePerM2Max) : currentPriceMax;
-    
-    const priceChanged = 
+
+    const priceChanged =
       (updateDto.pricePerM2Min !== undefined && newPriceMin !== currentPriceMin) ||
       (updateDto.pricePerM2Max !== undefined && newPriceMax !== currentPriceMax);
 
@@ -241,7 +242,7 @@ export class BuildingsService {
 
     // Transform camelCase to snake_case for database
     const updateData: any = {};
-    
+
     if (updateDto.title !== undefined) updateData.title = updateDto.title;
     if (updateDto.description !== undefined) updateData.description = updateDto.description;
     if (updateDto.address !== undefined) updateData.address = updateDto.address;
@@ -275,32 +276,32 @@ export class BuildingsService {
 
     // Use Raw SQL to update
     delete updateData.location;
-    
+
     const columns = Object.keys(updateData);
     if (columns.length > 0 || updateDto.location) {
       const values = columns.map(col => updateData[col]);
       const setClauses = columns.map((col, i) => `${col} = $${i + 1}`);
-      
+
       if (updateDto.location) {
         setClauses.push(`location = ST_SetSRID(ST_MakePoint(${updateDto.location.lng}, ${updateDto.location.lat}), 4326)`);
       }
-      
+
       // Add ID as last parameter
       values.push(id);
-      
+
       const sql = `
         UPDATE listings.buildings
         SET ${setClauses.join(', ')}
         WHERE id = $${values.length}
       `;
-      
+
       await this.buildingsRepository.query(sql, values);
     }
 
     // Admin operations should use admin view (isAdmin=true) to see drafts/archived
     const currency = updateDto.currency || building.currency || 'AMD';
     const updatedBuilding = await this.findOne(id, currency, true);
-    
+
     // Publish event
     await this.eventService.publishBuildingUpdated({
       id: updatedBuilding.id,
@@ -319,7 +320,7 @@ export class BuildingsService {
       status: updatedBuilding.status,
       updatedAt: typeof updatedBuilding.updatedAt === 'string' ? updatedBuilding.updatedAt : updatedBuilding.updatedAt?.toISOString(),
     });
-    
+
     return updatedBuilding;
   }
 
@@ -345,7 +346,7 @@ export class BuildingsService {
     });
 
     const updatedBuilding = await this.findOne(id, building.currency, true);
-    
+
     // Publish event
     if (publish) {
       await this.eventService.publishBuildingPublished({
@@ -366,7 +367,7 @@ export class BuildingsService {
         updatedAt: typeof updatedBuilding.updatedAt === 'string' ? updatedBuilding.updatedAt : updatedBuilding.updatedAt?.toISOString(),
       });
     }
-    
+
     return updatedBuilding;
   }
 
@@ -466,7 +467,7 @@ export class BuildingsService {
     // The location is stored as geography(POINT, 4326)
     // We need to extract coordinates using ST_X and ST_Y
     let location: { lat: number; lng: number } = { lat: 0, lng: 0 };
-    
+
     // If location is a string (WKT format), parse it
     if (typeof building.location === 'string') {
       const match = building.location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
@@ -521,6 +522,10 @@ export class BuildingsService {
       updatedAt: building.updated_at ? (building.updated_at instanceof Date ? building.updated_at.toISOString() : building.updated_at) : undefined,
       publishedAt: building.published_at ? (building.published_at instanceof Date ? building.published_at.toISOString() : building.published_at) : undefined,
       createdBy: building.created_by || undefined,
+      developer: building.developer ? {
+        id: building.developer.id,
+        name: building.developer.name,
+      } : undefined,
     } as BuildingResponseDto;
   }
 }
