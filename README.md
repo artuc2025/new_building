@@ -9394,5 +9394,7 @@ The script performs the following checks:
 
 **ASSUMPTION:** All consistency checks pass before the README is considered ready for use.
 
+https://www.figma.com/design/u9mhfpGuD7dj1XDQ07mEmz/Test?node-id=0-10&t=LLPA6wIpE2hoKbNL-0
+
 ---
 
